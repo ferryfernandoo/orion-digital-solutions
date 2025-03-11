@@ -226,7 +226,7 @@ const ChatBot = () => {
               disabled={!inputMessage.trim() || isBotTyping}
               className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Send
+              ↑
             </button>
           </div>
         </form>
