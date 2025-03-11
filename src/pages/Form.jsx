@@ -61,42 +61,54 @@ const Form = () => {
     setShowPopup(false);
   };
 
+  // Fungsi untuk convert file ke Base64
+  const convertFileToBase64 = (file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = (error) => reject(error);
+    });
+  };
+
   // Fungsi untuk mengirim email
-  const sendEmail = () => {
+  const sendEmail = async () => {
     setIsSubmitting(true);
 
-    // Data yang akan dikirim ke EmailJS
-    const templateParams = {
-      name: formData.name,
-      age: formData.age,
-      phone: formData.phone,
-      role: formData.role,
-      experience: formData.experience,
-      motivation: formData.motivation,
-      portfolio: formData.portfolio,
-    };
+    try {
+      // Convert file CV ke Base64
+      const cvBase64 = await convertFileToBase64(formData.cv);
 
-    // Kirim email menggunakan EmailJS
-    emailjs
-      .send(
+      // Data yang akan dikirim ke EmailJS
+      const templateParams = {
+        name: formData.name,
+        age: formData.age,
+        phone: formData.phone,
+        role: formData.role,
+        experience: formData.experience,
+        motivation: formData.motivation,
+        portfolio: formData.portfolio,
+        cv: cvBase64, // Tambahkan CV sebagai attachment
+        cv_filename: formData.cv.name, // Nama file CV
+      };
+
+      // Kirim email menggunakan EmailJS
+      const response = await emailjs.send(
         "service_2mr4ogr", 
         "template_81poifc", 
         templateParams,
         "R7wHrRQKYtT1nBLG-" 
-      )
-      .then(
-        (response) => {
-          console.log("Email sent successfully!", response);
-          alert("Application submitted successfully!");
-          setShowPopup(false);
-          setIsSubmitting(false);
-        },
-        (error) => {
-          console.error("Failed to send email:", error);
-          alert("Failed to submit application. Please try again.");
-          setIsSubmitting(false);
-        }
       );
+
+      console.log("Email sent successfully!", response);
+      alert("Application submitted successfully!");
+      setShowPopup(false);
+    } catch (error) {
+      console.error("Failed to send email:", error);
+      alert("Failed to submit application. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
