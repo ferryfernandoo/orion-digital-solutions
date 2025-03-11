@@ -50,11 +50,11 @@ const Home = () => {
 
           {/* Buttons */}
           <div className="flex justify-center gap-4 mb-12">
-            <button className="glass px-8 py-4 text-black font-semibold hover:bg-gray-100 transition">
+            <button className="glass px-8 py-4 text-white font-semibold hover:bg-gray-100 transition">
               Explore Our Innovations
             </button>
             <button 
-              className="glass px-8 py-4 text-black font-semibold hover:bg-gray-100 transition"
+              className="glass px-8 py-4 text-white font-semibold hover:bg-gray-100 transition"
               onClick={() => navigate("/chatbot")} // Arahkan ke halaman chatbot
             >
               Try Our First AI Chat
