@@ -1,7 +1,10 @@
 import React from "react";
 import { motion } from "framer-motion";
+import { useNavigate } from "react-router-dom"; // Import useNavigate
 
 const Home = () => {
+  const navigate = useNavigate(); // Inisialisasi useNavigate
+
   // Data untuk roles (tim)
   const roles = [
     { role: "Frontend Developer", emoji: "🖥️" },
@@ -52,7 +55,7 @@ const Home = () => {
             </button>
             <button 
               className="glass px-8 py-4 text-black font-semibold hover:bg-gray-100 transition"
-              onClick={() => window.location.href = "/chatbot"} // Arahkan ke halaman chatbot
+              onClick={() => navigate("/chatbot")} // Arahkan ke halaman chatbot
             >
               Try Our First AI Chat
             </button>
@@ -71,6 +74,14 @@ const Home = () => {
           {/* Join Our Team Section */}
           <div className="mt-16">
             <h2 className="text-3xl md:text-4xl font-bold mb-8">Join Our Team</h2>
+
+            {/* Tambahkan tombol "Join Our Team" */}
+            <button 
+              className="glass px-8 py-4 text-black font-semibold hover:bg-gray-100 transition mb-8"
+              onClick={() => navigate("/form")} // Arahkan ke halaman Form.jsx
+            >
+              Join Our Team
+            </button>
 
             {/* Marquee-like Horizontal Scrolling */}
             <div className="w-full overflow-hidden">
