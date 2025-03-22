@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import PropTypes from 'prop-types';
 import DOMPurify from 'dompurify';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const ChatBot = () => {
   const [messages, setMessages] = useState([]);
   const [inputMessage, setInputMessage] = useState('');
   const [isBotTyping, setIsBotTyping] = useState(false);
-  const [showTemplateButtons, setShowTemplateButtons] = useState(true); // State untuk menampilkan/hide button template
+  const [showTemplateButtons, setShowTemplateButtons] = useState(true);
   const messagesEndRef = useRef(null);
 
   const scrollToBottom = () => {
@@ -38,10 +39,10 @@ const ChatBot = () => {
     const timeoutId = setTimeout(() => controller.abort(), 300000);
 
     try {
-      // Tambah pesan user
       setMessages(prev => [...prev, createMessageObject(trimmedMessage, false)]);
       setInputMessage('');
       setIsBotTyping(true);
+      setShowTemplateButtons(false);
 
       const startTime = Date.now();
       const response = await fetch(
