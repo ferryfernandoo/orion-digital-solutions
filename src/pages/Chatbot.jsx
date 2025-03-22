@@ -9,7 +9,9 @@ const ChatBot = () => {
   const [isBotTyping, setIsBotTyping] = useState(false);
   const [showTemplateButtons, setShowTemplateButtons] = useState(true);
   const [isTypingAnimation, setIsTypingAnimation] = useState(false);
+  const [showFileOptions, setShowFileOptions] = useState(false);
   const messagesEndRef = useRef(null);
+  const textareaRef = useRef(null); // Ref untuk textarea
 
   const scrollToBottom = () => {
     if (messagesEndRef.current) {
@@ -45,6 +47,11 @@ const ChatBot = () => {
       setIsBotTyping(true);
       setIsTypingAnimation(true);
       setShowTemplateButtons(false);
+
+      // Reset textarea height
+      if (textareaRef.current) {
+        textareaRef.current.style.height = 'auto'; // Reset height
+      }
 
       const startTime = Date.now();
       const response = await fetch(
@@ -84,24 +91,35 @@ const ChatBot = () => {
   };
 
   const processSpecialChars = (text) => {
-    // Deteksi pola 1., 2., 3., dst dan ubah menjadi list
     const listRegex = /(\d+\.\s.*?)(?=\n\d+\.|$)/g;
     const processedText = text.replace(listRegex, (match) => {
       return `<li>${match.replace(/\d+\.\s/, '')}</li>`;
     });
 
-    // Jika ada list, bungkus dengan <ol>
     const hasList = listRegex.test(text);
     const finalText = hasList ? `<ol>${processedText}</ol>` : processedText;
 
     return finalText
-      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') // Bold
-      .replace(/\*(.*?)\*/g, '<em>$1</em>') // Italic
-      .replace(/_(.*?)_/g, '<u>$1</u>') // Underline
-      .replace(/~~(.*?)~~/g, '<s>$1</s>') // Strikethrough
-      .replace(/`(.*?)`/g, '<code>$1</code>') // Code
-      .replace(/###\{\}###/g, '<br />') // Line break
-      .replace(/### (.*?) ###/g, '<h3>$1</h3>'); // Heading
+      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*(.*?)\*/g, '<em>$1</em>')
+      .replace(/_(.*?)_/g, '<u>$1</u>')
+      .replace(/~~(.*?)~~/g, '<s>$1</s>')
+      .replace(/`(.*?)`/g, '<code>$1</code>')
+      .replace(/###\{\}###/g, '<br />')
+      .replace(/### (.*?) ###/g, '<h3>$1</h3>');
+  };
+
+  const handleFileUpload = (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const fileContent = e.target.result;
+        setMessages(prev => [...prev, createMessageObject(`File uploaded: ${file.name}`, false)]);
+        // Process file content here (e.g., send to API)
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   return (
@@ -252,8 +270,19 @@ const ChatBot = () => {
           e.preventDefault();
           handleSendMessage(inputMessage);
         }} className="space-y-2">
-          <div className="flex space-x-2">
+          <div className="flex space-x-2 items-end">
+            <button
+              type="button"
+              onClick={() => setShowFileOptions(!showFileOptions)}
+              className="flex items-center justify-center bg-gray-700 text-white p-2 rounded-full hover:bg-gray-600 transition-colors"
+            >
+              {/* Ikon Plus untuk menampilkan opsi file */}
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor" className="w-6 h-6">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+              </svg>
+            </button>
             <textarea
+              ref={textareaRef}
               value={inputMessage}
               onChange={(e) => {
                 setInputMessage(e.target.value);
@@ -261,20 +290,58 @@ const ChatBot = () => {
                 e.target.style.height = `${e.target.scrollHeight}px`;
               }}
               placeholder="Message Orion...."
-              className="flex-1 border border-gray-600 rounded-full px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-1000 bg-gray-700 text-white resize-none overflow-hidden transition-all duration-500 ease-in-out hover:border-blue-500"
+              className="flex-1 border border-gray-600 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-700 text-white resize-none overflow-hidden transition-all duration-500 ease-in-out hover:border-blue-500"
               rows={1}
               autoFocus
             />
             <button
               type="submit"
               disabled={!inputMessage.trim() || isBotTyping}
-              className="flex items-center justify-center bg-gradient-to-r from-blue-500 to-blue-700 text-white px-6 py-2 rounded-full font-semibold shadow-md hover:from-blue-600 hover:to-blue-800 hover:shadow-lg active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
+              className="flex items-center justify-center bg-gradient-to-r from-blue-500 to-blue-700 text-white p-2 rounded-full font-semibold shadow-md hover:from-blue-600 hover:to-blue-800 hover:shadow-lg active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
             >
+              {/* Ikon Kirim (Panah Kanan) */}
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor" className="w-6 h-6">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
               </svg>
             </button>
           </div>
+          {showFileOptions && (
+            <div className="flex space-x-2">
+              {/* Ikon Galeri untuk Upload Gambar */}
+              <button
+                type="button"
+                onClick={() => document.getElementById('image-upload').click()}
+                className="flex items-center justify-center bg-gray-700 text-white p-2 rounded-full hover:bg-gray-600 transition-colors"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor" className="w-6 h-6">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
+                </svg>
+              </button>
+              <input
+                id="image-upload"
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleFileUpload}
+              />
+              {/* Ikon Paperclip untuk Upload File */}
+              <button
+                type="button"
+                onClick={() => document.getElementById('file-upload').click()}
+                className="flex items-center justify-center bg-gray-700 text-white p-2 rounded-full hover:bg-gray-600 transition-colors"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor" className="w-6 h-6">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M18.375 12.739l-7.693 7.693a4.5 4.5 0 01-6.364-6.364l10.94-10.94A3 3 0 1119.5 7.372L8.552 18.32m.009-.01l-.01.01m5.699-9.941l-7.81 7.81a1.5 1.5 0 002.112 2.13" />
+                </svg>
+              </button>
+              <input
+                id="file-upload"
+                type="file"
+                className="hidden"
+                onChange={handleFileUpload}
+              />
+            </div>
+          )}
         </form>
       </div>
     </div>
