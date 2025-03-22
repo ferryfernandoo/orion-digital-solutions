@@ -1,11 +1,31 @@
 import React from "react";
 import { motion } from "framer-motion";
-import { useNavigate } from "react-router-dom"; // Import useNavigate
+import { useNavigate } from "react-router-dom";
+
+// Variants untuk animasi
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.3, // Animasi anak-anak dengan jeda 0.3 detik
+    },
+  },
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.5 } },
+};
+
+const buttonVariants = {
+  hidden: { opacity: 0, scale: 0.9 },
+  visible: { opacity: 1, scale: 1, transition: { duration: 0.5 } },
+};
 
 const Home = () => {
-  const navigate = useNavigate(); // Inisialisasi useNavigate
+  const navigate = useNavigate();
 
-  // Data untuk roles (tim)
   const roles = [
     { role: "Frontend Developer", emoji: "🖥️" },
     { role: "Backend Developer", emoji: "💻" },
@@ -15,7 +35,6 @@ const Home = () => {
     { role: "Project Management", emoji: "📋" },
   ];
 
-  // Data untuk info grid
   const infoGridItems = [
     {
       title: "🚀 AI for the Future",
@@ -37,66 +56,103 @@ const Home = () => {
       <section id="home" className="min-h-screen flex items-center relative z-10 pt-32 pb-12">
         <div className="container mx-auto px-4 text-center">
           {/* Title */}
-          <h1 className="text-5xl md:text-7xl font-bold mb-6">
+          <motion.h1
+            className="text-5xl md:text-7xl font-bold mb-6"
+            variants={itemVariants}
+            initial="hidden"
+            animate="visible"
+          >
             Orion <br />
             <span className="text-gray-400">Artificial Intelligence</span>
-          </h1>
+          </motion.h1>
 
           {/* Description */}
-          <p className="text-gray-400 text-lg md:text-xl mb-10 max-w-3xl mx-auto">
+          <motion.p
+            className="text-gray-400 text-lg md:text-xl mb-10 max-w-3xl mx-auto"
+            variants={itemVariants}
+            initial="hidden"
+            animate="visible"
+          >
             Orion is a leading AI company committed to building innovative technology solutions that not only transform
             businesses but also prioritize education, ensuring a broader impact on society and the digital future.
-          </p>
+          </motion.p>
 
           {/* Buttons */}
-          <div className="flex justify-center gap-4 mb-12">
-            <button className="glass px-8 py-4 text-white font-semibold hover:bg-gray-100 hover:text-black transition rounded-full">
+          <motion.div
+            className="flex justify-center gap-4 mb-12"
+            variants={containerVariants}
+            initial="hidden"
+            animate="visible"
+          >
+            <motion.button
+              className="glass px-8 py-4 text-white font-semibold hover:bg-gray-100 hover:text-black transition rounded-lg"
+              variants={buttonVariants}
+            >
               Explore Our Innovations
-            </button>
-            <button 
-              className="glass px-8 py-4 text-white font-semibold hover:bg-gray-100 hover:text-black transition rounded-full"
-              onClick={() => navigate("/chatbot")} // Arahkan ke halaman chatbot
+            </motion.button>
+            <motion.button
+              className="glass px-8 py-4 text-white font-semibold hover:bg-gray-100 hover:text-black transition rounded-lg"
+              onClick={() => navigate("/chatbot")}
+              variants={buttonVariants}
             >
               Try Our First AI Chat
-            </button>
-          </div>
+            </motion.button>
+          </motion.div>
 
           {/* Info Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 text-left">
+          <motion.div
+            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 text-left"
+            variants={containerVariants}
+            initial="hidden"
+            animate="visible"
+          >
             {infoGridItems.map((item, index) => (
-              <div key={index} className="glass p-6 rounded-lg">
+              <motion.div
+                key={index}
+                className="glass p-6 rounded-lg"
+                variants={itemVariants}
+              >
                 <h3 className="text-xl font-semibold mb-3">{item.title}</h3>
                 <p className="text-gray-400">{item.description}</p>
-              </div>
+              </motion.div>
             ))}
-          </div>
+          </motion.div>
 
           {/* Join Our Team Section */}
           <div className="mt-16">
-            <h2 className="text-3xl md:text-4xl font-bold mb-8">Join Our Team</h2>
-
-            {/* Tambahkan tombol "Join Our Team" */}
-            <button
-             className="glass px-8 py-4 text-white font-semibold hover:bg-gray-100 hover:text-black transition rounded-full mb-8"
-             onClick={() => navigate("/form")} // Arahkan ke halaman Form.jsx
+            <motion.h2
+              className="text-3xl md:text-4xl font-bold mb-8"
+              variants={itemVariants}
+              initial="hidden"
+              animate="visible"
             >
               Join Our Team
-            </button>
+            </motion.h2>
+
+            {/* Join Our Team Button */}
+            <motion.button
+              className="glass px-8 py-4 text-white font-semibold hover:bg-gray-100 hover:text-black transition rounded-lg mb-8"
+              onClick={() => navigate("/form")}
+              variants={buttonVariants}
+              initial="hidden"
+              animate="visible"
+            >
+              Join Our Team
+            </motion.button>
 
             {/* Marquee-like Horizontal Scrolling */}
             <div className="w-full overflow-hidden">
               <motion.div
                 className="flex"
                 animate={{
-                  x: ["0%", "-100%"], // Animasi dari kanan ke kiri
+                  x: ["0%", "-100%"],
                 }}
                 transition={{
-                  duration: 20, // Durasi animasi
-                  repeat: Infinity, // Looping terus menerus
-                  ease: "linear", // Animasi linear biar smooth
+                  duration: 20,
+                  repeat: Infinity,
+                  ease: "linear",
                 }}
               >
-                {/* Double the roles array untuk efek seamless looping */}
                 {[...roles, ...roles].map((job, index) => (
                   <div key={index} className="glass p-6 rounded-lg min-w-[250px] mx-3">
                     <h3 className="text-xl font-semibold mb-3">
