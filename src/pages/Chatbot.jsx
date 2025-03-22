@@ -84,7 +84,17 @@ const ChatBot = () => {
   };
 
   const processSpecialChars = (text) => {
-    return text
+    // Deteksi pola 1., 2., 3., dst dan ubah menjadi list
+    const listRegex = /(\d+\.\s.*?)(?=\n\d+\.|$)/g;
+    const processedText = text.replace(listRegex, (match) => {
+      return `<li>${match.replace(/\d+\.\s/, '')}</li>`;
+    });
+
+    // Jika ada list, bungkus dengan <ol>
+    const hasList = listRegex.test(text);
+    const finalText = hasList ? `<ol>${processedText}</ol>` : processedText;
+
+    return finalText
       .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') // Bold
       .replace(/\*(.*?)\*/g, '<em>$1</em>') // Italic
       .replace(/_(.*?)_/g, '<u>$1</u>') // Underline
