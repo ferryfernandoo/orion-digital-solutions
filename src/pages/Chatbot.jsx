@@ -85,11 +85,13 @@ const ChatBot = () => {
 
   const processSpecialChars = (text) => {
     return text
-      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-      .replace(/\*(.*?)\*/g, '<em>$1</em>')
-      .replace(/_(.*?)_/g, '<u>$1</u>')
-      .replace(/~~(.*?)~~/g, '<s>$1</s>')
-      .replace(/`(.*?)`/g, '<code>$1</code>');
+      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') // Bold
+      .replace(/\*(.*?)\*/g, '<em>$1</em>') // Italic
+      .replace(/_(.*?)_/g, '<u>$1</u>') // Underline
+      .replace(/~~(.*?)~~/g, '<s>$1</s>') // Strikethrough
+      .replace(/`(.*?)`/g, '<code>$1</code>') // Code
+      .replace(/###\{\}###/g, '<br />') // Line break
+      .replace(/### (.*?) ###/g, '<h3>$1</h3>'); // Heading
   };
 
   return (
@@ -122,8 +124,7 @@ const ChatBot = () => {
             </div>
 
             <h3 className="text-3xl md:text-5xl font-bold text-center mb-6">
-            Hey, I'm Orion!
-             Here to brighten your day! ✨
+              Hey, I'm Orion! Here to brighten your day! ✨
             </h3>
           </>
         )}
