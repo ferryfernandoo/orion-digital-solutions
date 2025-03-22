@@ -118,9 +118,9 @@ const ChatBot = () => {
               />
             </div>
 
-            <h1 className="text-3xl md:text-5xl font-bold text-center mb-6">
-              Orion Chat Bot
-            </h1>
+            <h3 className="text-3xl md:text-5xl font-bold text-center mb-6">
+              Hey, I'm Orion! Here to brighten your day! ✨
+            </h3>
           </>
         )}
 
