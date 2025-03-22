@@ -10,8 +10,9 @@ const ChatBot = () => {
   const [showTemplateButtons, setShowTemplateButtons] = useState(true);
   const [isTypingAnimation, setIsTypingAnimation] = useState(false);
   const [showFileOptions, setShowFileOptions] = useState(false);
+  const [pendingFiles, setPendingFiles] = useState([]); // State untuk file yang dipilih
   const messagesEndRef = useRef(null);
-  const textareaRef = useRef(null); // Ref untuk textarea
+  const textareaRef = useRef(null);
 
   const scrollToBottom = () => {
     if (messagesEndRef.current) {
@@ -26,31 +27,44 @@ const ChatBot = () => {
     scrollToBottom();
   }, [messages]);
 
-  const createMessageObject = (text, isBot, duration = 0) => ({
+  const createMessageObject = (text, isBot, duration = 0, file = null) => ({
     id: Date.now() + Math.random().toString(36).substr(2, 9),
     text: DOMPurify.sanitize(text),
     isBot,
     time: new Date().toLocaleTimeString(),
     duration,
+    file, // Menyimpan file (jika ada)
   });
 
-  const handleSendMessage = async (messageText) => {
+  const handleSendMessage = async (messageText, files = []) => {
     const trimmedMessage = messageText.trim();
-    if (!trimmedMessage || isBotTyping) return;
+    if ((!trimmedMessage && files.length === 0) || isBotTyping) return;
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 300000);
 
     try {
-      setMessages(prev => [...prev, createMessageObject(trimmedMessage, false)]);
+      // Tambahkan pesan teks (jika ada)
+      if (trimmedMessage) {
+        setMessages(prev => [...prev, createMessageObject(trimmedMessage, false)]);
+      }
+
+      // Tambahkan file (jika ada)
+      if (files.length > 0) {
+        files.forEach(file => {
+          setMessages(prev => [...prev, createMessageObject(`File: ${file.name}`, false, 0, file)]);
+        });
+      }
+
       setInputMessage('');
+      setPendingFiles([]); // Reset pending files
       setIsBotTyping(true);
       setIsTypingAnimation(true);
       setShowTemplateButtons(false);
 
       // Reset textarea height
       if (textareaRef.current) {
-        textareaRef.current.style.height = 'auto'; // Reset height
+        textareaRef.current.style.height = 'auto';
       }
 
       const startTime = Date.now();
@@ -110,15 +124,15 @@ const ChatBot = () => {
   };
 
   const handleFileUpload = (event) => {
-    const file = event.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const fileContent = e.target.result;
-        setMessages(prev => [...prev, createMessageObject(`File uploaded: ${file.name}`, false)]);
-        // Process file content here (e.g., send to API)
-      };
-      reader.readAsDataURL(file);
+    const files = Array.from(event.target.files);
+    if (files.length > 0) {
+      setPendingFiles(files); // Simpan file yang dipilih
+    }
+  };
+
+  const handleSendFiles = () => {
+    if (pendingFiles.length > 0) {
+      handleSendMessage(inputMessage, pendingFiles); // Kirim file bersama pesan (jika ada)
     }
   };
 
@@ -216,7 +230,16 @@ const ChatBot = () => {
                 </div>
               ) : (
                 <div className="max-w-[80%] md:max-w-[70%] rounded-lg p-3 bg-blue-600 shadow-md break-words whitespace-pre-wrap leading-relaxed">
-                  <div dangerouslySetInnerHTML={{ __html: message.text }} />
+                  {message.file ? (
+                    <div>
+                      <p>File: {message.file.name}</p>
+                      {message.file.type.startsWith('image/') && (
+                        <img src={URL.createObjectURL(message.file)} alt="Uploaded" className="mt-2 max-w-full h-auto rounded-lg" />
+                      )}
+                    </div>
+                  ) : (
+                    <div dangerouslySetInnerHTML={{ __html: message.text }} />
+                  )}
                   <p className="text-xs mt-1 opacity-70">
                     {message.time}
                   </p>
@@ -268,15 +291,44 @@ const ChatBot = () => {
       <div className="border-t border-gray-700 p-4 bg-gray-800">
         <form onSubmit={(e) => {
           e.preventDefault();
-          handleSendMessage(inputMessage);
+          handleSendMessage(inputMessage, pendingFiles);
         }} className="space-y-2">
+          {/* Pratinjau File */}
+          {pendingFiles.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {pendingFiles.map((file, index) => (
+                <div key={index} className="relative">
+                  {file.type.startsWith('image/') ? (
+                    <img src={URL.createObjectURL(file)} alt="Preview" className="w-16 h-16 object-cover rounded-lg" />
+                  ) : (
+                    <div className="w-16 h-16 flex items-center justify-center bg-gray-700 rounded-lg">
+                      <span className="text-sm">📄</span>
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const newFiles = [...pendingFiles];
+                      newFiles.splice(index, 1);
+                      setPendingFiles(newFiles);
+                    }}
+                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor" className="w-4 h-4">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
           <div className="flex space-x-2 items-end">
             <button
               type="button"
               onClick={() => setShowFileOptions(!showFileOptions)}
               className="flex items-center justify-center bg-gray-700 text-white p-2 rounded-full hover:bg-gray-600 transition-colors"
             >
-              {/* Ikon Plus untuk menampilkan opsi file */}
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor" className="w-6 h-6">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
               </svg>
@@ -296,10 +348,9 @@ const ChatBot = () => {
             />
             <button
               type="submit"
-              disabled={!inputMessage.trim() || isBotTyping}
+              disabled={(!inputMessage.trim() && pendingFiles.length === 0) || isBotTyping}
               className="flex items-center justify-center bg-gradient-to-r from-blue-500 to-blue-700 text-white p-2 rounded-full font-semibold shadow-md hover:from-blue-600 hover:to-blue-800 hover:shadow-lg active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
             >
-              {/* Ikon Kirim (Panah Kanan) */}
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor" className="w-6 h-6">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
               </svg>
@@ -356,6 +407,7 @@ ChatBot.propTypes = {
       isBot: PropTypes.bool.isRequired,
       time: PropTypes.string.isRequired,
       duration: PropTypes.number,
+      file: PropTypes.object,
     })
   ),
 };
