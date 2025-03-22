@@ -1,296 +1,117 @@
-import React, { useState, useEffect, useRef } from 'react';
-import PropTypes from 'prop-types';
-import DOMPurify from 'dompurify';
-import { motion, AnimatePresence } from 'framer-motion';
+import React from "react";
+import { motion } from "framer-motion";
+import { useNavigate } from "react-router-dom"; // Import useNavigate
 
-const ChatBot = () => {
-  const [messages, setMessages] = useState([]);
-  const [inputMessage, setInputMessage] = useState('');
-  const [isBotTyping, setIsBotTyping] = useState(false);
-  const [showTemplateButtons, setShowTemplateButtons] = useState(true);
-  const [isTypingAnimation, setIsTypingAnimation] = useState(false);
-  const messagesEndRef = useRef(null);
+const Home = () => {
+  const navigate = useNavigate(); // Inisialisasi useNavigate
 
-  const scrollToBottom = () => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({
-        behavior: 'smooth',
-        block: 'nearest',
-      });
-    }
-  };
+  // Data untuk roles (tim)
+  const roles = [
+    { role: "Frontend Developer", emoji: "🖥️" },
+    { role: "Backend Developer", emoji: "💻" },
+    { role: "Machine Learning Engineer", emoji: "🤖" },
+    { role: "Database Administrator", emoji: "🗄️" },
+    { role: "DevOps Engineer", emoji: "⚙️" },
+    { role: "Project Management", emoji: "📋" },
+  ];
 
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
-
-  const createMessageObject = (text, isBot, duration = 0) => ({
-    id: Date.now() + Math.random().toString(36).substr(2, 9),
-    text: DOMPurify.sanitize(text),
-    isBot,
-    time: new Date().toLocaleTimeString(),
-    duration,
-  });
-
-  const handleSendMessage = async (messageText) => {
-    const trimmedMessage = messageText.trim();
-    if (!trimmedMessage || isBotTyping) return;
-
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 300000);
-
-    try {
-      setMessages(prev => [...prev, createMessageObject(trimmedMessage, false)]);
-      setInputMessage('');
-      setIsBotTyping(true);
-      setIsTypingAnimation(true);
-      setShowTemplateButtons(false);
-
-      const startTime = Date.now();
-      const response = await fetch(
-        `https://api.ryzendesu.vip/api/ai/deepseek?text=${encodeURIComponent(trimmedMessage)}`,
-        {
-          method: 'GET',
-          headers: { 
-            accept: 'application/json',
-          },
-          signal: controller.signal,
-        }
-      );
-
-      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-      
-      const data = await response.json();
-      const botResponse = data.response || data.answer || data.message || 'can`t proceed';
-      const processedResponse = processSpecialChars(botResponse);
-      const duration = Date.now() - startTime;
-
-      setMessages(prev => [...prev, createMessageObject(processedResponse, true, duration)]);
-    } catch (error) {
-      const errorMessage = error.name === 'AbortError' 
-        ? 'request timeout after 30s. Try again.'
-        : 'Waduh, ada yang salah nih sama Orion! gak konek ke servernya...i have problem here, im so sorry...哎呀，发生错误了。请稍后再试';
-      
-      setMessages(prev => [...prev, createMessageObject(errorMessage, true)]);
-    } finally {
-      setIsBotTyping(false);
-      setIsTypingAnimation(false);
-      clearTimeout(timeoutId);
-    }
-  };
-
-  const handleTemplateButtonClick = (templateMessage) => {
-    handleSendMessage(templateMessage);
-  };
-
-  const processSpecialChars = (text) => {
-    // Deteksi pola 1., 2., 3., dst dan ubah menjadi list
-    const listRegex = /(\d+\.\s.*?)(?=\n\d+\.|$)/g;
-    const processedText = text.replace(listRegex, (match) => {
-      return `<li>${match.replace(/\d+\.\s/, '')}</li>`;
-    });
-
-    // Jika ada list, bungkus dengan <ol>
-    const hasList = listRegex.test(text);
-    const finalText = hasList ? `<ol>${processedText}</ol>` : processedText;
-
-    return finalText
-      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') // Bold
-      .replace(/\*(.*?)\*/g, '<em>$1</em>') // Italic
-      .replace(/_(.*?)_/g, '<u>$1</u>') // Underline
-      .replace(/~~(.*?)~~/g, '<s>$1</s>') // Strikethrough
-      .replace(/`(.*?)`/g, '<code>$1</code>') // Code
-      .replace(/###\{\}###/g, '<br />') // Line break
-      .replace(/### (.*?) ###/g, '<h3>$1</h3>'); // Heading
-  };
+  // Data untuk info grid
+  const infoGridItems = [
+    {
+      title: "🚀 AI for the Future",
+      description: "We develop AI solutions that empower businesses to grow faster and more efficiently.",
+    },
+    {
+      title: "📚 AI in Education",
+      description: "Our AI initiatives help educate the public on the rapid advancements in technology.",
+    },
+    {
+      title: "🌍 Proudly Representing Our Nation",
+      description: "We are proud to be the first AI company from our country competing globally.",
+    },
+  ];
 
   return (
-    <div className="flex flex-col h-screen text-white relative opacity-90 z-10 bg-gradient-to-br from-gray-900 to-gray-800">
-      {/* Header */}
-      <div className="bg-gray-700 p-4 flex items-center justify-between">
-        <div className="flex items-center">
-          <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center mr-3">
-            <span className="text-xl">🤖</span>
+    <>
+      {/* Hero Section */}
+      <section id="home" className="min-h-screen flex items-center relative z-10 pt-32 pb-12">
+        <div className="container mx-auto px-4 text-center">
+          {/* Title */}
+          <h1 className="text-5xl md:text-7xl font-bold mb-6">
+            Orion <br />
+            <span className="text-gray-400">Artificial Intelligence</span>
+          </h1>
+
+          {/* Description */}
+          <p className="text-gray-400 text-lg md:text-xl mb-10 max-w-3xl mx-auto">
+            Orion is a leading AI company committed to building innovative technology solutions that not only transform
+            businesses but also prioritize education, ensuring a broader impact on society and the digital future.
+          </p>
+
+          {/* Buttons */}
+          <div className="flex justify-center gap-4 mb-12">
+            <button className="glass px-8 py-4 text-white font-semibold hover:bg-gray-100 hover:text-black transition rounded-lg">
+              Explore Our Innovations
+            </button>
+            <button 
+              className="glass px-8 py-4 text-white font-semibold hover:bg-gray-100 hover:text-black transition rounded-lg"
+              onClick={() => navigate("/chatbot")} // Arahkan ke halaman chatbot
+            >
+              Try Our First AI Chat
+            </button>
           </div>
-          <div>
-            <h2 className="font-bold">Orion Chat Bot</h2>
-            <p className="text-sm opacity-75">
-              {isBotTyping ? 'Typing...' : 'Online'}
-            </p>
+
+          {/* Info Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 text-left">
+            {infoGridItems.map((item, index) => (
+              <div key={index} className="glass p-6 rounded-lg">
+                <h3 className="text-xl font-semibold mb-3">{item.title}</h3>
+                <p className="text-gray-400">{item.description}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Join Our Team Section */}
+          <div className="mt-16">
+            <h2 className="text-3xl md:text-4xl font-bold mb-8">Join Our Team</h2>
+
+            {/* Tambahkan tombol "Join Our Team" */}
+            <button
+             className="glass px-8 py-4 text-white font-semibold hover:bg-gray-100 hover:text-black transition rounded-lg mb-8"
+             onClick={() => navigate("/form")} // Arahkan ke halaman Form.jsx
+            >
+              Join Our Team
+            </button>
+
+            {/* Marquee-like Horizontal Scrolling */}
+            <div className="w-full overflow-hidden">
+              <motion.div
+                className="flex"
+                animate={{
+                  x: ["0%", "-100%"], // Animasi dari kanan ke kiri
+                }}
+                transition={{
+                  duration: 20, // Durasi animasi
+                  repeat: Infinity, // Looping terus menerus
+                  ease: "linear", // Animasi linear biar smooth
+                }}
+              >
+                {/* Double the roles array untuk efek seamless looping */}
+                {[...roles, ...roles].map((job, index) => (
+                  <div key={index} className="glass p-6 rounded-lg min-w-[250px] mx-3">
+                    <h3 className="text-xl font-semibold mb-3">
+                      {job.emoji} {job.role}
+                    </h3>
+                    <p className="text-gray-400">Join our team and be part of the AI revolution.</p>
+                  </div>
+                ))}
+              </motion.div>
+            </div>
           </div>
         </div>
-      </div>
-
-      {/* Chat Area */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800">
-        {messages.length === 0 && (
-          <>
-            <div className="flex justify-center mb-4">
-              <img 
-                src="/orion.png" 
-                alt="Orion Logo" 
-                className="h-24 md:h-32"
-              />
-            </div>
-
-            <h3 className="text-3xl md:text-5xl font-bold text-center mb-6">
-              Hey, I'm Orion! Here to brighten your day! ✨
-            </h3>
-          </>
-        )}
-
-        {showTemplateButtons && messages.length === 0 && (
-          <div className="flex flex-wrap gap-2 justify-center mb-6">
-            <button
-              onClick={() => handleTemplateButtonClick("Hello Orion")}
-              className="bg-gray-500 text-white px-4 py-2 rounded-full hover:bg-gray-600 transition-colors"
-            >
-              Hallo
-            </button>
-            <button
-              onClick={() => handleTemplateButtonClick("Brainstorm some ideas for me.")}
-              className="bg-gray-500 text-white px-4 py-2 rounded-full hover:bg-gray-600 transition-colors"
-            >
-              Brainstorm
-            </button>
-            <button
-              onClick={() => handleTemplateButtonClick("Give me simple random knowledge for")}
-              className="bg-gray-500 text-white px-4 py-2 rounded-full hover:bg-gray-600 transition-colors"
-            >
-              Explain
-            </button>
-            <button
-              onClick={() => handleTemplateButtonClick("Help me with a problem.")}
-              className="bg-gray-500 text-white px-4 py-2 rounded-full hover:bg-gray-600 transition-colors"
-            >
-              Help
-            </button>
-          </div>
-        )}
-
-        <AnimatePresence>
-          {messages.map((message) => (
-            <motion.div
-              key={message.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              transition={{ duration: 0.3 }}
-              className={`flex ${message.isBot ? 'items-start' : 'justify-end'}`}
-            >
-              {message.isBot && (
-                <img 
-                  src="/orion.png" 
-                  alt="Orion Logo" 
-                  className="h-12 mr-3" 
-                />
-              )}
-              {message.isBot ? (
-                <div className="flex-1">
-                  <div 
-                    className="bg-gray-600 text-white rounded-lg p-3 shadow-md max-w-[80%] md:max-w-[70%] break-words whitespace-pre-wrap leading-relaxed"
-                    dangerouslySetInnerHTML={{ __html: message.text }} 
-                  />
-                  <p className="text-xs mt-1 opacity-70">
-                    {message.time}
-                    {message.isBot && ` • ${(message.duration / 1000).toFixed(1)} sec`}
-                  </p>
-                </div>
-              ) : (
-                <div className="max-w-[80%] md:max-w-[70%] rounded-lg p-3 bg-blue-600 shadow-md break-words whitespace-pre-wrap leading-relaxed">
-                  <div dangerouslySetInnerHTML={{ __html: message.text }} />
-                  <p className="text-xs mt-1 opacity-70">
-                    {message.time}
-                  </p>
-                </div>
-              )}
-            </motion.div>
-          ))}
-        </AnimatePresence>
-        
-        {isTypingAnimation && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            transition={{ duration: 0.3 }}
-            className="flex justify-start"
-          >
-            <div className="bg-gray-600 text-white rounded-lg p-3 shadow-md">
-              <div className="flex items-center space-x-2">
-                <span>Wait, Orion is thinking deeply</span>
-                <div className="flex space-x-1">
-                  <motion.span
-                    animate={{ opacity: [0, 1, 0] }}
-                    transition={{ duration: 1, repeat: Infinity }}
-                  >
-                    .
-                  </motion.span>
-                  <motion.span
-                    animate={{ opacity: [0, 1, 0] }}
-                    transition={{ duration: 1, repeat: Infinity, delay: 0.3 }}
-                  >
-                    .
-                  </motion.span>
-                  <motion.span
-                    animate={{ opacity: [0, 1, 0] }}
-                    transition={{ duration: 1, repeat: Infinity, delay: 0.6 }}
-                  >
-                    .
-                  </motion.span>
-                </div>
-              </div>
-            </div>
-          </motion.div>
-        )}
-        <div ref={messagesEndRef} />
-      </div>
-
-      {/* Input Form */}
-      <div className="border-t border-gray-700 p-4 bg-gray-800">
-        <form onSubmit={(e) => {
-          e.preventDefault();
-          handleSendMessage(inputMessage);
-        }} className="space-y-2">
-          <div className="flex space-x-2">
-            <textarea
-              value={inputMessage}
-              onChange={(e) => {
-                setInputMessage(e.target.value);
-                e.target.style.height = "auto";
-                e.target.style.height = `${e.target.scrollHeight}px`;
-              }}
-              placeholder="Message Orion...."
-              className="flex-1 border border-gray-600 rounded-full px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-1000 bg-gray-700 text-white resize-none overflow-hidden transition-all duration-500 ease-in-out hover:border-blue-500"
-              rows={1}
-              autoFocus
-            />
-            <button
-              type="submit"
-              disabled={!inputMessage.trim() || isBotTyping}
-              className="flex items-center justify-center bg-gradient-to-r from-blue-500 to-blue-700 text-white px-6 py-2 rounded-full font-semibold shadow-md hover:from-blue-600 hover:to-blue-800 hover:shadow-lg active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor" className="w-6 h-6">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-              </svg>
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+      </section>
+    </>
   );
 };
 
-ChatBot.propTypes = {
-  messages: PropTypes.arrayOf(
-    PropTypes.shape({
-      id: PropTypes.string.isRequired,
-      text: PropTypes.string.isRequired,
-      isBot: PropTypes.bool.isRequired,
-      time: PropTypes.string.isRequired,
-      duration: PropTypes.number,
-    })
-  ),
-};
-
-export default ChatBot;
+export default Home;
