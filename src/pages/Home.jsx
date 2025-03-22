@@ -50,11 +50,11 @@ const Home = () => {
 
           {/* Buttons */}
           <div className="flex justify-center gap-4 mb-12">
-            <button className="glass px-8 py-4 text-white font-semibold hover:bg-gray-100 hover:text-black transition">
+            <button className="glass px-8 py-4 text-white font-semibold hover:bg-gray-100 hover:text-black transition rounded-full">
               Explore Our Innovations
             </button>
             <button 
-              className="glass px-8 py-4 text-white font-semibold hover:bg-gray-100 hover:text-black transition"
+              className="glass px-8 py-4 text-white font-semibold hover:bg-gray-100 hover:text-black transition rounded-full"
               onClick={() => navigate("/chatbot")} // Arahkan ke halaman chatbot
             >
               Try Our First AI Chat
@@ -76,9 +76,9 @@ const Home = () => {
             <h2 className="text-3xl md:text-4xl font-bold mb-8">Join Our Team</h2>
 
             {/* Tambahkan tombol "Join Our Team" */}
-            <button 
-              className="glass px-8 py-4 text-black font-semibold hover:bg-gray-100 hover:text-black transition mb-8"
-              onClick={() => navigate("/form")} // Arahkan ke halaman Form.jsx
+            <button
+             className="glass px-8 py-4 text-white font-semibold hover:bg-gray-100 hover:text-black transition rounded-full mb-8"
+             onClick={() => navigate("/form")} // Arahkan ke halaman Form.jsx
             >
               Join Our Team
             </button>
