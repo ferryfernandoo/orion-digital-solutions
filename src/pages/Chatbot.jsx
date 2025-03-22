@@ -187,14 +187,17 @@ const ChatBot = () => {
               )}
               {message.isBot ? (
                 <div className="flex-1">
-                  <div dangerouslySetInnerHTML={{ __html: message.text }} />
+                  <div 
+                    className="bg-gray-600 text-white rounded-lg p-3 shadow-md max-w-[80%] md:max-w-[70%] break-words whitespace-pre-wrap"
+                    dangerouslySetInnerHTML={{ __html: message.text }} 
+                  />
                   <p className="text-xs mt-1 opacity-70">
                     {message.time}
                     {message.isBot && ` • ${(message.duration / 1000).toFixed(1)} sec`}
                   </p>
                 </div>
               ) : (
-                <div className="max-w-[70%] rounded-lg p-3 bg-blue-600 shadow-md">
+                <div className="max-w-[80%] md:max-w-[70%] rounded-lg p-3 bg-blue-600 shadow-md break-words whitespace-pre-wrap">
                   <div dangerouslySetInnerHTML={{ __html: message.text }} />
                   <p className="text-xs mt-1 opacity-70">
                     {message.time}
