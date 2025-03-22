@@ -8,7 +8,6 @@ const ChatBot = () => {
   const [inputMessage, setInputMessage] = useState('');
   const [isBotTyping, setIsBotTyping] = useState(false);
   const [showTemplateButtons, setShowTemplateButtons] = useState(true);
-  const [conversationContext, setConversationContext] = useState([]);
   const messagesEndRef = useRef(null);
 
   const scrollToBottom = () => {
@@ -40,25 +39,19 @@ const ChatBot = () => {
     const timeoutId = setTimeout(() => controller.abort(), 300000);
 
     try {
-      const userMessage = createMessageObject(trimmedMessage, false);
-      setMessages(prev => [...prev, userMessage]);
+      setMessages(prev => [...prev, createMessageObject(trimmedMessage, false)]);
       setInputMessage('');
       setIsBotTyping(true);
       setShowTemplateButtons(false);
 
       const startTime = Date.now();
-      const context = [...conversationContext, { role: 'user', content: trimmedMessage }];
-      setConversationContext(context);
-
       const response = await fetch(
         `https://api.ryzendesu.vip/api/ai/deepseek?text=${encodeURIComponent(trimmedMessage)}`,
         {
-          method: 'POST',
+          method: 'GET',
           headers: { 
-            'Content-Type': 'application/json',
             accept: 'application/json',
           },
-          body: JSON.stringify({ context }),
           signal: controller.signal,
         }
       );
@@ -70,9 +63,7 @@ const ChatBot = () => {
       const processedResponse = processSpecialChars(botResponse);
       const duration = Date.now() - startTime;
 
-      const botMessage = createMessageObject(processedResponse, true, duration);
-      setMessages(prev => [...prev, botMessage]);
-      setConversationContext(prev => [...prev, { role: 'assistant', content: processedResponse }]);
+      setMessages(prev => [...prev, createMessageObject(processedResponse, true, duration)]);
     } catch (error) {
       const errorMessage = error.name === 'AbortError' 
         ? 'request timeout after 30s. Try again.'
