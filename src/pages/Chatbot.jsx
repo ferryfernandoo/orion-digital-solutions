@@ -92,7 +92,19 @@ const ChatBot = () => {
   return (
     <div className="flex flex-col h-screen text-white relative opacity-90 z-10 bg-gradient-to-br from-gray-900 to-gray-800">
       {/* Header */}
-      
+      <div className="bg-gray-700 p-4 flex items-center justify-between">
+        <div className="flex items-center">
+          <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center mr-3">
+            <span className="text-xl">🤖</span>
+          </div>
+          <div>
+            <h2 className="font-bold">Orion Chat Bot</h2>
+            <p className="text-sm opacity-75">
+              {isBotTyping ? 'Typing...' : 'Online'}
+            </p>
+          </div>
+        </div>
+      </div>
 
       {/* Chat Area */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800">
