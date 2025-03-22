@@ -63,7 +63,30 @@ const ChatBot = () => {
       const processedResponse = processSpecialChars(botResponse);
       const duration = Date.now() - startTime;
 
-      setMessages(prev => [...prev, createMessageObject(processedResponse, true, duration)]);
+      // Simulate typing effect
+      let index = 0;
+      const typingInterval = setInterval(() => {
+        if (index < processedResponse.length) {
+          setMessages(prev => {
+            const lastMessage = prev[prev.length - 1];
+            if (lastMessage.isBot) {
+              return [
+                ...prev.slice(0, -1),
+                {
+                  ...lastMessage,
+                  text: processedResponse.substring(0, index + 1),
+                },
+              ];
+            }
+            return prev;
+          });
+          index++;
+        } else {
+          clearInterval(typingInterval);
+          setIsBotTyping(false);
+        }
+      }, 50); // Adjust typing speed here
+
     } catch (error) {
       const errorMessage = error.name === 'AbortError' 
         ? 'request timeout after 30s. Try again.'
