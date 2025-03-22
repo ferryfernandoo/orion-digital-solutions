@@ -10,6 +10,30 @@ const ChatBot = () => {
   const [showTemplateButtons, setShowTemplateButtons] = useState(true);
   const messagesEndRef = useRef(null);
 
+  // Fungsi untuk menyimpan riwayat percakapan ke localStorage
+  const saveChatHistory = (messages) => {
+    localStorage.setItem('chatHistory', JSON.stringify(messages));
+  };
+
+  // Fungsi untuk memuat riwayat percakapan dari localStorage
+  const loadChatHistory = () => {
+    const history = localStorage.getItem('chatHistory');
+    return history ? JSON.parse(history) : [];
+  };
+
+  // Memuat riwayat percakapan saat komponen pertama kali dimuat
+  useEffect(() => {
+    const savedMessages = loadChatHistory();
+    if (savedMessages.length > 0) {
+      setMessages(savedMessages);
+    }
+  }, []);
+
+  // Menyimpan riwayat percakapan setiap kali ada perubahan
+  useEffect(() => {
+    saveChatHistory(messages);
+  }, [messages]);
+
   const scrollToBottom = () => {
     if (messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({
@@ -39,37 +63,52 @@ const ChatBot = () => {
     const timeoutId = setTimeout(() => controller.abort(), 300000);
 
     try {
-      setMessages(prev => [...prev, createMessageObject(trimmedMessage, false)]);
+      // Tambahkan pesan pengguna ke riwayat
+      const userMessage = createMessageObject(trimmedMessage, false);
+      setMessages((prev) => [...prev, userMessage]);
       setInputMessage('');
       setIsBotTyping(true);
       setShowTemplateButtons(false);
 
+      // Siapkan riwayat percakapan untuk dikirim ke API
+      const chatHistory = messages.map((msg) => ({
+        role: msg.isBot ? 'assistant' : 'user',
+        content: msg.text,
+      }));
+      chatHistory.push({ role: 'user', content: trimmedMessage });
+
       const startTime = Date.now();
       const response = await fetch(
-        `https://api.ryzendesu.vip/api/ai/deepseek?text=${encodeURIComponent(trimmedMessage)}`,
+        `https://api.ryzendesu.vip/api/ai/deepseek`,
         {
-          method: 'GET',
-          headers: { 
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
             accept: 'application/json',
           },
+          body: JSON.stringify({
+            messages: chatHistory, // Kirim riwayat percakapan ke API
+          }),
           signal: controller.signal,
         }
       );
 
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-      
+
       const data = await response.json();
       const botResponse = data.response || data.answer || data.message || 'can`t proceed';
       const processedResponse = processSpecialChars(botResponse);
       const duration = Date.now() - startTime;
 
-      setMessages(prev => [...prev, createMessageObject(processedResponse, true, duration)]);
+      // Tambahkan respons AI ke riwayat
+      setMessages((prev) => [...prev, createMessageObject(processedResponse, true, duration)]);
     } catch (error) {
-      const errorMessage = error.name === 'AbortError' 
-        ? 'request timeout after 30s. Try again.'
-        : 'Waduh, ada yang salah nih sama Orion! gak konek ke servernya...i have problem here, im so sorry...哎呀，发生错误了。请稍后再试';
-      
-      setMessages(prev => [...prev, createMessageObject(errorMessage, true)]);
+      const errorMessage =
+        error.name === 'AbortError'
+          ? 'Request timeout after 30s. Try again.'
+          : 'Waduh, ada yang salah nih sama Orion! gak konek ke servernya...i have problem here, im so sorry...哎呀，发生错误了。请稍后再试';
+
+      setMessages((prev) => [...prev, createMessageObject(errorMessage, true)]);
     } finally {
       setIsBotTyping(false);
       clearTimeout(timeoutId);
@@ -111,9 +150,9 @@ const ChatBot = () => {
         {messages.length === 0 && (
           <>
             <div className="flex justify-center mb-4">
-              <img 
-                src="/orion.png" 
-                alt="Orion Logo" 
+              <img
+                src="/orion.png"
+                alt="Orion Logo"
                 className="h-24 md:h-32"
               />
             </div>
@@ -139,7 +178,7 @@ const ChatBot = () => {
               Brainstorm
             </button>
             <button
-              onClick={() => handleTemplateButtonClick("Give me simple random knowledge for")}
+              onClick={() => handleTemplateButtonClick("Give me simple random knowledge")}
               className="bg-gray-500 text-white px-4 py-2 rounded-full hover:bg-gray-600 transition-colors"
             >
               Explain
@@ -164,10 +203,10 @@ const ChatBot = () => {
               className={`flex ${message.isBot ? 'items-start' : 'justify-end'}`}
             >
               {message.isBot && (
-                <img 
-                  src="/orion.png" 
-                  alt="Orion Logo" 
-                  className="h-12 mr-3" 
+                <img
+                  src="/orion.png"
+                  alt="Orion Logo"
+                  className="h-12 mr-3"
                 />
               )}
               {message.isBot ? (
@@ -189,15 +228,15 @@ const ChatBot = () => {
             </motion.div>
           ))}
         </AnimatePresence>
-        
+
         {isBotTyping && (
           <div className="flex justify-start">
             <div className="bg-gray-600 text-white rounded-lg p-3 shadow-md">
               <div className="flex space-x-2">
                 <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" 
+                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
                      style={{ animationDelay: '0.2s' }} />
-                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" 
+                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"
                      style={{ animationDelay: '0.4s' }} />
               </div>
             </div>
@@ -208,10 +247,13 @@ const ChatBot = () => {
 
       {/* Input Form */}
       <div className="border-t border-gray-700 p-4 bg-gray-800">
-        <form onSubmit={(e) => {
-          e.preventDefault();
-          handleSendMessage(inputMessage);
-        }} className="space-y-2">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleSendMessage(inputMessage);
+          }}
+          className="space-y-2"
+        >
           <div className="flex space-x-2">
             <textarea
               value={inputMessage}
