@@ -188,7 +188,7 @@ const ChatBot = () => {
               {message.isBot ? (
                 <div className="flex-1">
                   <div 
-                    className="bg-gray-600 text-white rounded-lg p-3 shadow-md max-w-[80%] md:max-w-[70%] break-words whitespace-pre-wrap"
+                    className="bg-gray-600 text-white rounded-lg p-3 shadow-md max-w-[80%] md:max-w-[70%] break-words whitespace-pre-wrap leading-relaxed"
                     dangerouslySetInnerHTML={{ __html: message.text }} 
                   />
                   <p className="text-xs mt-1 opacity-70">
@@ -197,7 +197,7 @@ const ChatBot = () => {
                   </p>
                 </div>
               ) : (
-                <div className="max-w-[80%] md:max-w-[70%] rounded-lg p-3 bg-blue-600 shadow-md break-words whitespace-pre-wrap">
+                <div className="max-w-[80%] md:max-w-[70%] rounded-lg p-3 bg-blue-600 shadow-md break-words whitespace-pre-wrap leading-relaxed">
                   <div dangerouslySetInnerHTML={{ __html: message.text }} />
                   <p className="text-xs mt-1 opacity-70">
                     {message.time}
