@@ -8,6 +8,7 @@ const ChatBot = () => {
   const [inputMessage, setInputMessage] = useState('');
   const [isBotTyping, setIsBotTyping] = useState(false);
   const [showTemplateButtons, setShowTemplateButtons] = useState(true);
+  const [isTypingAnimation, setIsTypingAnimation] = useState(false);
   const messagesEndRef = useRef(null);
 
   const scrollToBottom = () => {
@@ -42,6 +43,7 @@ const ChatBot = () => {
       setMessages(prev => [...prev, createMessageObject(trimmedMessage, false)]);
       setInputMessage('');
       setIsBotTyping(true);
+      setIsTypingAnimation(true);
       setShowTemplateButtons(false);
 
       const startTime = Date.now();
@@ -72,6 +74,7 @@ const ChatBot = () => {
       setMessages(prev => [...prev, createMessageObject(errorMessage, true)]);
     } finally {
       setIsBotTyping(false);
+      setIsTypingAnimation(false);
       clearTimeout(timeoutId);
     }
   };
@@ -191,18 +194,40 @@ const ChatBot = () => {
           ))}
         </AnimatePresence>
         
-        {isBotTyping && (
-          <div className="flex justify-start">
+        {isTypingAnimation && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.3 }}
+            className="flex justify-start"
+          >
             <div className="bg-gray-600 text-white rounded-lg p-3 shadow-md">
-              <div className="flex space-x-2">
-                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" 
-                     style={{ animationDelay: '0.2s' }} />
-                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" 
-                     style={{ animationDelay: '0.4s' }} />
+              <div className="flex items-center space-x-2">
+                <span>Wait, Orion is thinking deeply</span>
+                <div className="flex space-x-1">
+                  <motion.span
+                    animate={{ opacity: [0, 1, 0] }}
+                    transition={{ duration: 1, repeat: Infinity }}
+                  >
+                    .
+                  </motion.span>
+                  <motion.span
+                    animate={{ opacity: [0, 1, 0] }}
+                    transition={{ duration: 1, repeat: Infinity, delay: 0.3 }}
+                  >
+                    .
+                  </motion.span>
+                  <motion.span
+                    animate={{ opacity: [0, 1, 0] }}
+                    transition={{ duration: 1, repeat: Infinity, delay: 0.6 }}
+                  >
+                    .
+                  </motion.span>
+                </div>
               </div>
             </div>
-          </div>
+          </motion.div>
         )}
         <div ref={messagesEndRef} />
       </div>
