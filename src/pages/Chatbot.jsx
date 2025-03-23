@@ -69,7 +69,7 @@ const ChatBot = () => {
 
       const startTime = Date.now();
       const response = await fetch(
-        `https://api.ryzendesu.vip/api/ai/mistral?text=${encodeURIComponent(trimmedMessage)}`,
+        `https://api.ryzendesu.vip/api/ai/jina?text=${encodeURIComponent(trimmedMessage)}`,
         {
           method: 'GET',
           headers: { 
