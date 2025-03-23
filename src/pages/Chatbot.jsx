@@ -17,7 +17,7 @@ const ChatBot = () => {
   const textareaRef = useRef(null);
 
   // Inisialisasi Google Generative AI
-  const genAI = new GoogleGenerativeAI("AIzaSyDSTgkkROL7mjaGKoD2vnc8l2UptNCbvHk"); // Ganti dengan API key Anda
+  const genAI = new GoogleGenerativeAI("YOUR_API_KEY"); // Ganti dengan API key Anda
   const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
   const scrollToBottom = () => {
