@@ -75,7 +75,7 @@ const ChatBot = () => {
     const fullMessage = contextMessage;
 
       const response = await fetch(
-        `https://api.ryzendesu.vip/api/ai/gemini?text=${encodeURIComponent(fullMessage)}`,
+        `https://api.ryzendesu.vip/api/ai/deepseek?text=${encodeURIComponent(fullMessage)}`,
         {
           method: 'GET',
           headers: { 
