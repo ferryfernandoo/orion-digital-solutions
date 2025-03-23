@@ -41,7 +41,7 @@ const ChatBot = () => {
     if ((!trimmedMessage && files.length === 0) || isBotTyping) return;
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000); // Timeout 30 detik
+    const timeoutId = setTimeout(() => controller.abort(), 300000);
 
     try {
       // Tambahkan pesan teks (jika ada)
@@ -68,46 +68,28 @@ const ChatBot = () => {
       }
 
       const startTime = Date.now();
-
-      // Kirim request ke Groq API
       const response = await fetch(
-        `https://api.groq.com/openai/v1/chat/completions`, // Endpoint Groq API
+        `https://api.ryzendesu.vip/api/ai/mistral?text=${encodeURIComponent(trimmedMessage)}`,
         {
-          method: 'POST',
+          method: 'GET',
           headers: { 
-            'Content-Type': 'application/json',
-            'Authorization': 'Bgsk_LeqG9UTco9ssty80EPhCWGdyb3FYN0zQjOKB4oS9cyTscL6hY1yE', // Ganti dengan API key Groq Anda
+            accept: 'application/json',
           },
-          body: JSON.stringify({
-            model: 'llama-3.3-70b-versatile', // Model yang digunakan
-            messages: [
-              {
-                role: 'user',
-                content: trimmedMessage,
-              },
-            ],
-          }),
           signal: controller.signal,
         }
       );
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
+      
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      
       const data = await response.json();
-      console.log('API Response:', data); // Debugging: Log respons API
-
-      // Proses respons dari Groq API
-      const botResponse = data.choices[0]?.message?.content || 'can`t proceed';
+      const botResponse = data.response || data.answer || data.message || 'can`t proceed';
       const processedResponse = processSpecialChars(botResponse);
       const duration = Date.now() - startTime;
 
       setMessages(prev => [...prev, createMessageObject(processedResponse, true, duration)]);
     } catch (error) {
-      console.error('Error:', error); // Debugging: Log error
       const errorMessage = error.name === 'AbortError' 
-        ? 'Request timeout after 30s. Try again.'
+        ? 'request timeout after 30s. Try again.'
         : 'Waduh, ada yang salah nih sama Orion! gak konek ke servernya...i have problem here, im so sorry...哎呀，发生错误了。请稍后再试';
       
       setMessages(prev => [...prev, createMessageObject(errorMessage, true)]);
