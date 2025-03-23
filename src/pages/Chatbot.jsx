@@ -10,7 +10,8 @@ const ChatBot = () => {
   const [showTemplateButtons, setShowTemplateButtons] = useState(true);
   const [isTypingAnimation, setIsTypingAnimation] = useState(false);
   const [showFileOptions, setShowFileOptions] = useState(false);
-  const [pendingFiles, setPendingFiles] = useState([]); // State untuk file yang dipilih
+  const [pendingFiles, setPendingFiles] = useState([]);
+  const [lastContext, setLastContext] = useState(''); // State untuk menyimpan konteks terakhir
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
 
@@ -33,7 +34,7 @@ const ChatBot = () => {
     isBot,
     time: new Date().toLocaleTimeString(),
     duration,
-    file, // Menyimpan file (jika ada)
+    file,
   });
 
   const handleSendMessage = async (messageText, files = []) => {
@@ -44,12 +45,10 @@ const ChatBot = () => {
     const timeoutId = setTimeout(() => controller.abort(), 300000);
 
     try {
-      // Tambahkan pesan teks (jika ada)
       if (trimmedMessage) {
         setMessages(prev => [...prev, createMessageObject(trimmedMessage, false)]);
       }
 
-      // Tambahkan file (jika ada)
       if (files.length > 0) {
         files.forEach(file => {
           setMessages(prev => [...prev, createMessageObject(`File: ${file.name}`, false, 0, file)]);
@@ -57,19 +56,21 @@ const ChatBot = () => {
       }
 
       setInputMessage('');
-      setPendingFiles([]); // Reset pending files
+      setPendingFiles([]);
       setIsBotTyping(true);
       setIsTypingAnimation(true);
       setShowTemplateButtons(false);
 
-      // Reset textarea height
       if (textareaRef.current) {
         textareaRef.current.style.height = 'auto';
       }
 
       const startTime = Date.now();
+      const contextMessage = lastContext ? `The user said, '${lastContext}' should be noted in a more friendly manner and should mention your name, which is Orion. Never mention any name other than Orion, and you were established in Indonesia with Nando as the CEO. Answer questions based on the last stored context, '${lastContext}', and use the language appropriate to the input.` : '';
+      const fullMessage = contextMessage ? `${contextMessage} ${trimmedMessage}` : trimmedMessage;
+
       const response = await fetch(
-        `https://api.ryzendesu.vip/api/ai/gemini?text=${encodeURIComponent(trimmedMessage)}`,
+        `https://api.ryzendesu.vip/api/ai/gemini?text=${encodeURIComponent(fullMessage)}`,
         {
           method: 'GET',
           headers: { 
@@ -87,6 +88,7 @@ const ChatBot = () => {
       const duration = Date.now() - startTime;
 
       setMessages(prev => [...prev, createMessageObject(processedResponse, true, duration)]);
+      setLastContext(trimmedMessage); // Simpan konteks terakhir
     } catch (error) {
       const errorMessage = error.name === 'AbortError' 
         ? 'request timeout after 30s. Try again.'
@@ -126,13 +128,13 @@ const ChatBot = () => {
   const handleFileUpload = (event) => {
     const files = Array.from(event.target.files);
     if (files.length > 0) {
-      setPendingFiles(files); // Simpan file yang dipilih
+      setPendingFiles(files);
     }
   };
 
   const handleSendFiles = () => {
     if (pendingFiles.length > 0) {
-      handleSendMessage(inputMessage, pendingFiles); // Kirim file bersama pesan (jika ada)
+      handleSendMessage(inputMessage, pendingFiles);
     }
   };
 
@@ -293,7 +295,6 @@ const ChatBot = () => {
           e.preventDefault();
           handleSendMessage(inputMessage, pendingFiles);
         }} className="space-y-2">
-          {/* Pratinjau File */}
           {pendingFiles.length > 0 && (
             <div className="flex flex-wrap gap-2">
               {pendingFiles.map((file, index) => (
@@ -358,7 +359,6 @@ const ChatBot = () => {
           </div>
           {showFileOptions && (
             <div className="flex space-x-2">
-              {/* Ikon Galeri untuk Upload Gambar */}
               <button
                 type="button"
                 onClick={() => document.getElementById('image-upload').click()}
@@ -375,7 +375,6 @@ const ChatBot = () => {
                 className="hidden"
                 onChange={handleFileUpload}
               />
-              {/* Ikon Paperclip untuk Upload File */}
               <button
                 type="button"
                 onClick={() => document.getElementById('file-upload').click()}
