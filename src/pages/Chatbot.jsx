@@ -150,12 +150,20 @@ const ChatBot = () => {
     }
   };
 
+  const copyToClipboard = (text) => {
+    navigator.clipboard.writeText(text).then(() => {
+      alert('Text copied to clipboard!');
+    }).catch(err => {
+      console.error('Failed to copy text: ', err);
+    });
+  };
+
   return (
     <div className="flex flex-col h-screen text-white relative opacity-90 z-10 bg-gradient-to-br from-gray-900 to-gray-800">
       {/* Header */}
       <div className="bg-gray-700 p-4 flex items-center justify-between">
         <div className="flex items-center">
-          <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center mr-3">
+          <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center mr-3">
             <span className="text-xl">🤖</span>
           </div>
           <div>
@@ -175,7 +183,7 @@ const ChatBot = () => {
               <img 
                 src="/orion.png" 
                 alt="Orion Logo" 
-                className="h-24 md:h-32"
+                className="h-16 md:h-24"
               />
             </div>
 
@@ -228,19 +236,27 @@ const ChatBot = () => {
                 <img 
                   src="/orion.png" 
                   alt="Orion Logo" 
-                  className="h-12 mr-3" 
+                  className="h-8 mr-3" 
                 />
               )}
               {message.isBot ? (
                 <div className="flex-1">
                   <div 
-                    className="bg-gray-600 text-white rounded-lg p-3 shadow-md max-w-[80%] md:max-w-[70%] break-words whitespace-pre-wrap leading-relaxed"
+                    className="bg-gray-600 text-white rounded-lg p-3 shadow-md w-full backdrop-blur-sm bg-opacity-50 break-words whitespace-pre-wrap leading-relaxed"
                     dangerouslySetInnerHTML={{ __html: message.text }} 
                   />
-                  <p className="text-xs mt-1 opacity-70">
-                    {message.time}
-                    {message.isBot && ` • ${(message.duration / 1000).toFixed(1)} sec`}
-                  </p>
+                  <div className="flex justify-between items-center mt-1">
+                    <p className="text-xs opacity-70">
+                      {message.time}
+                      {message.isBot && ` • ${(message.duration / 1000).toFixed(1)} sec`}
+                    </p>
+                    <button
+                      onClick={() => copyToClipboard(message.text)}
+                      className="text-xs opacity-70 hover:opacity-100 transition-opacity"
+                    >
+                      Copy
+                    </button>
+                  </div>
                 </div>
               ) : (
                 <div className="max-w-[80%] md:max-w-[70%] rounded-lg p-3 bg-blue-600 shadow-md break-words whitespace-pre-wrap leading-relaxed">
@@ -271,7 +287,7 @@ const ChatBot = () => {
             transition={{ duration: 0.3 }}
             className="flex justify-start"
           >
-            <div className="bg-gray-600 text-white rounded-lg p-3 shadow-md">
+            <div className="bg-gray-600 text-white rounded-lg p-3 shadow-md backdrop-blur-sm bg-opacity-50">
               <div className="flex items-center space-x-2">
                 <span>Wait, Orion is thinking deeply</span>
                 <div className="flex space-x-1">
