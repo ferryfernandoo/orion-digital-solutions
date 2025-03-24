@@ -15,7 +15,6 @@ const ChatBot = () => {
   const [chatHistory, setChatHistory] = useState([]);
   const [showMemoryPanel, setShowMemoryPanel] = useState(false);
   const [memories, setMemories] = useState([]);
-  const [longTermMemories, setLongTermMemories] = useState([]);
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
 
@@ -26,14 +25,8 @@ const ChatBot = () => {
   // Load memories from localStorage on component mount
   useEffect(() => {
     const savedMemories = localStorage.getItem('orionMemories');
-    const savedLongTermMemories = localStorage.getItem('orionLongTermMemories');
-    
     if (savedMemories) {
       setMemories(JSON.parse(savedMemories));
-    }
-    
-    if (savedLongTermMemories) {
-      setLongTermMemories(JSON.parse(savedLongTermMemories));
     }
   }, []);
 
@@ -61,45 +54,22 @@ const ChatBot = () => {
 
   const summarizeConversation = async (conversation) => {
     try {
-      const prompt = `Create two versions of a summary for this conversation:
-      
-      1. SHORT-TERM (for immediate context): 2-3 sentences capturing key details needed to continue this specific conversation.
-      
-      2. LONG-TERM (for future reference): A concise but meaningful summary (1-2 sentences) that captures the essence and any important learnings that might be useful in future conversations.
-      
-      Return as JSON:
-      {
-        "shortTerm": "summary text",
-        "longTerm": "summary text"
-      }
-      
-      Conversation:
-      ${conversation}`;
+      const prompt = `Buat ringkasan sangat singkat (maks 2 kalimat) dari percakapan ini dalam bahasa yang sama dengan percakapan. Fokus pada fakta kunci, keputusan, dan detail penting. HILANGKAN semua salam dan basa-basi.\n\nPercakapan:\n${conversation}`;
       
       const result = await model.generateContent(prompt);
-      const response = result.response.text();
+      const response = await result.response.text();
       
-      // Try to parse the JSON response
-      try {
-        const parsed = JSON.parse(response);
-        return {
-          shortTerm: parsed.shortTerm || "",
-          longTerm: parsed.longTerm || ""
-        };
-      } catch {
-        // Fallback if JSON parsing fails
-        const parts = response.split('\n');
-        return {
-          shortTerm: parts[0] || response,
-          longTerm: parts[1] || response
-        };
-      }
+      // Clean response to avoid JSON artifacts
+      const cleanResponse = response
+        .replace(/[{}]/g, '')
+        .replace(/json/gi, '')
+        .replace(/```/g, '')
+        .trim();
+      
+      return cleanResponse || "Ringkasan tidak tersedia";
     } catch (error) {
       console.error("Error summarizing conversation:", error);
-      return {
-        shortTerm: "Conversation summary unavailable",
-        longTerm: "Conversation summary unavailable"
-      };
+      return "Tidak bisa membuat ringkasan";
     }
   };
 
@@ -114,34 +84,19 @@ const ChatBot = () => {
         `${msg.isBot ? 'Orion' : 'User'}: ${msg.text}`
       ).join('\n');
       
-      const { shortTerm, longTerm } = await summarizeConversation(conversationText);
+      const summary = await summarizeConversation(conversationText);
       
-      // Save to short-term memory
-      if (shortTerm) {
+      if (summary && !summary.includes("tidak bisa")) {
         const newMemory = {
           id: Date.now().toString(),
-          summary: shortTerm,
+          summary: summary,
           date: new Date().toLocaleString(),
-          messages: [...messages]
+          messages: [...messages].slice(-3) // Save last 3 messages
         };
         
-        const updatedMemories = [newMemory, ...memories].slice(0, 50);
+        const updatedMemories = [newMemory, ...memories].slice(0, 10); // Keep only 10 latest memories
         setMemories(updatedMemories);
         localStorage.setItem('orionMemories', JSON.stringify(updatedMemories));
-      }
-      
-      // Save to long-term memory if meaningful
-      if (longTerm && !longTerm.includes("summary unavailable")) {
-        const newLongTermMemory = {
-          id: `long-${Date.now().toString()}`,
-          summary: longTerm,
-          date: new Date().toLocaleString(),
-          relevanceScore: 1 // Initial relevance score
-        };
-        
-        const updatedLongTermMemories = [newLongTermMemory, ...longTermMemories].slice(0, 200);
-        setLongTermMemories(updatedLongTermMemories);
-        localStorage.setItem('orionLongTermMemories', JSON.stringify(updatedLongTermMemories));
       }
     } catch (error) {
       console.error("Error saving to memory:", error);
@@ -150,38 +105,16 @@ const ChatBot = () => {
     }
   };
 
-  const getRelevantMemories = async (currentMessage) => {
-    let context = "";
+  const getRelevantMemories = () => {
+    if (memories.length === 0) return '';
     
     try {
-      // First check short-term memories
-      if (memories.length > 0) {
-        const shortTermPrompt = `From these recent memories, select ONLY the 1-2 most relevant to this new message: "${currentMessage}". Return them verbatim without modification.\n\nMemories:\n${memories.slice(0, 10).map(m => m.summary).join('\n')}`;
-        
-        const shortTermResult = await model.generateContent(shortTermPrompt);
-        const shortTermMemories = shortTermResult.response.text();
-        
-        if (shortTermMemories) {
-          context += `Recent context:\n${shortTermMemories}\n\n`;
-        }
-      }
-      
-      // Then check long-term memories if we have them
-      if (longTermMemories.length > 0) {
-        const longTermPrompt = `From these long-term memories, select ONLY the 1-2 most relevant to this new message: "${currentMessage}". Return them verbatim without modification.\n\nMemories:\n${longTermMemories.slice(0, 30).map(m => m.summary).join('\n')}`;
-        
-        const longTermResult = await model.generateContent(longTermPrompt);
-        const longTermMemoriesText = longTermResult.response.text();
-        
-        if (longTermMemoriesText) {
-          context += `Long-term context:\n${longTermMemoriesText}\n\n`;
-        }
-      }
-      
-      return context;
+      // Combine top 3 memories
+      const topMemories = memories.slice(0, 3).map(m => m.summary).join('\n');
+      return `Konteks sebelumnya:\n${topMemories}\n\n`;
     } catch (error) {
       console.error("Error retrieving memories:", error);
-      return "";
+      return '';
     }
   };
 
@@ -220,8 +153,8 @@ const ChatBot = () => {
 
       const startTime = Date.now();
 
-      // Get relevant memories (both short-term and long-term)
-      const memoryContext = await getRelevantMemories(trimmedMessage);
+      // Get relevant memories
+      const memoryContext = getRelevantMemories();
       
       // Combine chat history into prompt
       const contextMessage = updatedHistory
@@ -234,11 +167,9 @@ const ChatBot = () => {
         })
         .join('\n');
 
-      const fullMessage = `${memoryContext}Current conversation:\n${contextMessage}\n\nNow, the user says: "${trimmedMessage}". 
-
-      Respond naturally as Orion, incorporating any relevant context from memories when appropriate. You were established in Indonesia with Nando as CEO. Keep responses friendly with occasional emoticons. If Indonesian is detected, respond in 'gue-lo' Jaksel style when appropriate. Use language matching the input. 
-
-      IMPORTANT: When using memory context, weave it naturally into the conversation without explicitly mentioning "based on our previous conversation".`;
+      const fullMessage = `${memoryContext}Percakapan saat ini:\n${contextMessage}\n\nSekarang user berkata: "${trimmedMessage}". 
+      Respond as Orion in natural language, incorporating any relevant context when appropriate. Use friendly tone with occasional emoticons. 
+      If Indonesian is detected, respond in 'gue-lo' Jaksel style when appropriate. Match the user's language.`;
 
       // Generate response using Google Generative AI
       const result = await model.generateContent(fullMessage);
@@ -252,8 +183,8 @@ const ChatBot = () => {
       const botMessage = { role: 'assistant', content: botResponse };
       setChatHistory(prev => [...prev, botMessage].slice(-10));
 
-      // Save to memory every 3 messages or when conversation seems substantial
-      if (messages.length > 0 && (messages.length % 3 === 0 || trimmedMessage.length > 100)) {
+      // Save to memory every 5 messages
+      if (messages.length > 0 && messages.length % 5 === 0) {
         await saveToMemory();
       }
     } catch (error) {
@@ -316,16 +247,10 @@ const ChatBot = () => {
     setShowTemplateButtons(true);
   };
 
-  const deleteMemory = (id, isLongTerm = false) => {
-    if (isLongTerm) {
-      const updatedMemories = longTermMemories.filter(memory => memory.id !== id);
-      setLongTermMemories(updatedMemories);
-      localStorage.setItem('orionLongTermMemories', JSON.stringify(updatedMemories));
-    } else {
-      const updatedMemories = memories.filter(memory => memory.id !== id);
-      setMemories(updatedMemories);
-      localStorage.setItem('orionMemories', JSON.stringify(updatedMemories));
-    }
+  const deleteMemory = (id) => {
+    const updatedMemories = memories.filter(memory => memory.id !== id);
+    setMemories(updatedMemories);
+    localStorage.setItem('orionMemories', JSON.stringify(updatedMemories));
   };
 
   return (
@@ -424,7 +349,7 @@ const ChatBot = () => {
                 <div className="max-w-[80%] md:max-w-[70%] rounded-lg p-3 bg-blue-600 shadow-md break-words whitespace-pre-wrap leading-relaxed">
                   {message.file ? (
                     <div>
-                      <p>File: ${message.file.name}</p>
+                      <p>File: {message.file.name}</p>
                       {message.file.type.startsWith('image/') && (
                         <img src={URL.createObjectURL(message.file)} alt="Uploaded" className="mt-2 max-w-full h-auto rounded-lg" />
                       )}
@@ -545,14 +470,14 @@ const ChatBot = () => {
                 onClick={() => setShowMemoryPanel(!showMemoryPanel)}
                 className="flex items-center space-x-1 bg-gray-600 text-white px-3 py-1 rounded-full hover:bg-gray-500 transition-colors text-xs"
               >
-                <span>Memory v3</span>
+                <span>Memory</span>
                 <span>⋯</span>
               </button>
               
               {showMemoryPanel && (
                 <div className="absolute bottom-full mb-2 left-0 w-64 bg-gray-700 rounded-lg shadow-lg z-20 p-3 max-h-96 overflow-y-auto">
                   <div className="flex justify-between items-center mb-2">
-                    <h4 className="font-bold">Memory System</h4>
+                    <h4 className="font-bold">Essential Context</h4>
                     <button 
                       onClick={() => setShowMemoryPanel(false)}
                       className="text-gray-400 hover:text-white"
@@ -561,53 +486,26 @@ const ChatBot = () => {
                     </button>
                   </div>
                   
-                  <div className="mb-4">
-                    <h5 className="font-semibold text-sm mb-1">Short-Term</h5>
-                    {memories.length === 0 ? (
-                      <p className="text-xs text-gray-400">No recent context</p>
-                    ) : (
-                      <div className="space-y-2">
-                        {memories.slice(0, 3).map((memory) => (
-                          <div key={memory.id} className="bg-gray-600 p-2 rounded-lg">
-                            <div className="flex justify-between items-start">
-                              <p className="text-xs break-words">{memory.summary}</p>
-                              <button
-                                onClick={() => deleteMemory(memory.id)}
-                                className="text-gray-400 hover:text-red-400 text-xs"
-                              >
-                                Delete
-                              </button>
-                            </div>
-                            <p className="text-xs text-gray-400 mt-1">{memory.date}</p>
+                  {memories.length === 0 ? (
+                    <p className="text-sm text-gray-400">No important context yet</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {memories.map((memory) => (
+                        <div key={memory.id} className="bg-gray-600 p-2 rounded-lg">
+                          <div className="flex justify-between items-start">
+                            <p className="text-xs break-words">{memory.summary}</p>
+                            <button
+                              onClick={() => deleteMemory(memory.id)}
+                              className="text-gray-400 hover:text-red-400 text-xs"
+                            >
+                              Delete
+                            </button>
                           </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                  
-                  <div>
-                    <h5 className="font-semibold text-sm mb-1">Long-Term</h5>
-                    {longTermMemories.length === 0 ? (
-                      <p className="text-xs text-gray-400">No long-term memories yet</p>
-                    ) : (
-                      <div className="space-y-2">
-                        {longTermMemories.slice(0, 3).map((memory) => (
-                          <div key={memory.id} className="bg-gray-600 p-2 rounded-lg">
-                            <div className="flex justify-between items-start">
-                              <p className="text-xs break-words">{memory.summary}</p>
-                              <button
-                                onClick={() => deleteMemory(memory.id, true)}
-                                className="text-gray-400 hover:text-red-400 text-xs"
-                              >
-                                Delete
-                              </button>
-                            </div>
-                            <p className="text-xs text-gray-400 mt-1">{memory.date}</p>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+                          <p className="text-xs text-gray-400 mt-1">{memory.date}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
