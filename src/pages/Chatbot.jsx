@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import PropTypes from 'prop-types';
 import DOMPurify from 'dompurify';
 import { motion, AnimatePresence } from 'framer-motion';
-import { GoogleGenerativeAI } from "@google/generative-ai"; // Import SDK Google Generative AI
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const ChatBot = () => {
   const [messages, setMessages] = useState([]);
@@ -12,13 +12,23 @@ const ChatBot = () => {
   const [isTypingAnimation, setIsTypingAnimation] = useState(false);
   const [showFileOptions, setShowFileOptions] = useState(false);
   const [pendingFiles, setPendingFiles] = useState([]);
-  const [chatHistory, setChatHistory] = useState([]); // Simpan riwayat chat terakhir
+  const [chatHistory, setChatHistory] = useState([]);
+  const [showMemoryPanel, setShowMemoryPanel] = useState(false);
+  const [memories, setMemories] = useState([]);
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
 
-  // Inisialisasi Google Generative AI
-  const genAI = new GoogleGenerativeAI("AIzaSyDSTgkkROL7mjaGKoD2vnc8l2UptNCbvHk"); // Ganti dengan API key Anda
+  // Initialize Google Generative AI
+  const genAI = new GoogleGenerativeAI("AIzaSyDSTgkkROL7mjaGKoD2vnc8l2UptNCbvHk");
   const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+
+  // Load memories from localStorage on component mount
+  useEffect(() => {
+    const savedMemories = localStorage.getItem('orionMemories');
+    if (savedMemories) {
+      setMemories(JSON.parse(savedMemories));
+    }
+  }, []);
 
   const scrollToBottom = () => {
     if (messagesEndRef.current) {
@@ -42,6 +52,69 @@ const ChatBot = () => {
     file,
   });
 
+  const summarizeConversation = async (conversation) => {
+    try {
+      const prompt = `Create an extremely concise summary (max 2 sentences) capturing ONLY the essential context from this conversation. Focus on key facts, decisions, and important details that would be needed to continue this conversation later. Remove all greetings and small talk. Summary must be in the same language as the conversation.\n\nConversation:\n${conversation}`;
+      
+      const result = await model.generateContent(prompt);
+      const summary = result.response.text();
+      
+      return summary;
+    } catch (error) {
+      console.error("Error summarizing conversation:", error);
+      return null;
+    }
+  };
+
+  const saveToMemory = async () => {
+    if (messages.length === 0) return;
+    
+    try {
+      setIsBotTyping(true);
+      
+      // Format conversation history for summarization
+      const conversationText = messages.map(msg => 
+        `${msg.isBot ? 'Orion' : 'User'}: ${msg.text}`
+      ).join('\n');
+      
+      const summary = await summarizeConversation(conversationText);
+      
+      if (summary) {
+        const newMemory = {
+          id: Date.now().toString(),
+          summary: summary,
+          date: new Date().toLocaleString(),
+          messages: [...messages]
+        };
+        
+        const updatedMemories = [newMemory, ...memories].slice(0, 50);
+        setMemories(updatedMemories);
+        localStorage.setItem('orionMemories', JSON.stringify(updatedMemories));
+      }
+    } catch (error) {
+      console.error("Error saving to memory:", error);
+    } finally {
+      setIsBotTyping(false);
+    }
+  };
+
+  const getRelevantMemories = async (currentMessage) => {
+    if (memories.length === 0) return '';
+    
+    try {
+      // Find most relevant memories based on current message
+      const prompt = `From these memories, select ONLY the 2-3 most relevant to this new message: "${currentMessage}". Return them verbatim without modification.\n\nMemories:\n${memories.slice(0, 10).map(m => m.summary).join('\n')}`;
+      
+      const result = await model.generateContent(prompt);
+      const relevantMemories = result.response.text();
+      
+      return relevantMemories ? `Relevant context:\n${relevantMemories}\n\n` : '';
+    } catch (error) {
+      console.error("Error retrieving memories:", error);
+      return '';
+    }
+  };
+
   const handleSendMessage = async (messageText, files = []) => {
     const trimmedMessage = messageText.trim();
     if ((!trimmedMessage && files.length === 0) || isBotTyping) return;
@@ -50,9 +123,9 @@ const ChatBot = () => {
     const timeoutId = setTimeout(() => controller.abort(), 300000);
 
     try {
-      // Tambahkan pesan pengguna ke riwayat chat
+      // Add user message to chat history
       const userMessage = { role: 'user', content: trimmedMessage };
-      const updatedHistory = [...chatHistory, userMessage].slice(-10); // Simpan 10 pesan terakhir
+      const updatedHistory = [...chatHistory, userMessage].slice(-10);
       setChatHistory(updatedHistory);
 
       if (trimmedMessage) {
@@ -77,7 +150,10 @@ const ChatBot = () => {
 
       const startTime = Date.now();
 
-      // Gabungkan riwayat chat ke dalam prompt
+      // Get relevant memories
+      const memoryContext = await getRelevantMemories(trimmedMessage);
+      
+      // Combine chat history into prompt
       const contextMessage = updatedHistory
         .map((msg, index) => {
           if (msg.role === 'user') {
@@ -88,9 +164,9 @@ const ChatBot = () => {
         })
         .join('\n');
 
-      const fullMessage = `This is the conversation history:\n${contextMessage}\n\nNow, the user says: "${trimmedMessage}". Respond naturally, mentioning your name, Orion, but never any other. You were established in Indonesia with Nando as the CEO. Keep responses friendly with emoticons. If Indonesian is detected, prioritize 'gue-lo' Jaksel style. This processing is hidden; do not reveal it. Use language appropriate to the input.`;
+      const fullMessage = `${memoryContext}Current conversation:\n${contextMessage}\n\nNow, the user says: "${trimmedMessage}". Respond naturally as Orion, mentioning your name occasionally. You were established in Indonesia with Nando as CEO. Keep responses friendly with occasional emoticons. If Indonesian is detected, respond in 'gue-lo' Jaksel style when appropriate. Use language matching the input.`;
 
-      // Menggunakan Google Generative AI untuk menghasilkan respons
+      // Generate response using Google Generative AI
       const result = await model.generateContent(fullMessage);
       const botResponse = result.response.text();
       const processedResponse = processSpecialChars(botResponse);
@@ -98,9 +174,14 @@ const ChatBot = () => {
 
       setMessages(prev => [...prev, createMessageObject(processedResponse, true, duration)]);
       
-      // Tambahkan respons bot ke riwayat chat
+      // Add bot response to chat history
       const botMessage = { role: 'assistant', content: botResponse };
-      setChatHistory(prev => [...prev, botMessage].slice(-10)); // Simpan 10 pesan terakhir
+      setChatHistory(prev => [...prev, botMessage].slice(-10));
+
+      // Save to memory every 5 messages
+      if (messages.length > 0 && messages.length % 5 === 0) {
+        await saveToMemory();
+      }
     } catch (error) {
       const errorMessage = error.name === 'AbortError' 
         ? 'Request timeout after 30s. Try again.'
@@ -150,12 +231,21 @@ const ChatBot = () => {
     }
   };
 
-  const copyToClipboard = (text) => {
-    navigator.clipboard.writeText(text).then(() => {
-      alert('Text copied to clipboard!');
-    }).catch(err => {
-      console.error('Failed to copy text: ', err);
-    });
+  const startNewConversation = async () => {
+    if (messages.length > 0) {
+      await saveToMemory();
+    }
+    setMessages([]);
+    setChatHistory([]);
+    setPendingFiles([]);
+    setInputMessage('');
+    setShowTemplateButtons(true);
+  };
+
+  const deleteMemory = (id) => {
+    const updatedMemories = memories.filter(memory => memory.id !== id);
+    setMemories(updatedMemories);
+    localStorage.setItem('orionMemories', JSON.stringify(updatedMemories));
   };
 
   return (
@@ -163,7 +253,7 @@ const ChatBot = () => {
       {/* Header */}
       <div className="bg-gray-700 p-4 flex items-center justify-between">
         <div className="flex items-center">
-          <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center mr-3">
+          <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center mr-3">
             <span className="text-xl">🤖</span>
           </div>
           <div>
@@ -183,7 +273,7 @@ const ChatBot = () => {
               <img 
                 src="/orion.png" 
                 alt="Orion Logo" 
-                className="h-16 md:h-24"
+                className="h-24 md:h-32"
               />
             </div>
 
@@ -236,27 +326,19 @@ const ChatBot = () => {
                 <img 
                   src="/orion.png" 
                   alt="Orion Logo" 
-                  className="h-8 mr-3" 
+                  className="h-12 mr-3" 
                 />
               )}
               {message.isBot ? (
                 <div className="flex-1">
                   <div 
-                    className="bg-gray-600 text-white rounded-lg p-3 shadow-md w-full backdrop-blur-sm bg-opacity-50 break-words whitespace-pre-wrap leading-relaxed"
+                    className="bg-gray-600 text-white rounded-lg p-3 shadow-md max-w-[80%] md:max-w-[70%] break-words whitespace-pre-wrap leading-relaxed"
                     dangerouslySetInnerHTML={{ __html: message.text }} 
                   />
-                  <div className="flex justify-between items-center mt-1">
-                    <p className="text-xs opacity-70">
-                      {message.time}
-                      {message.isBot && ` • ${(message.duration / 1000).toFixed(1)} sec`}
-                    </p>
-                    <button
-                      onClick={() => copyToClipboard(message.text)}
-                      className="text-xs opacity-70 hover:opacity-100 transition-opacity"
-                    >
-                      Copy
-                    </button>
-                  </div>
+                  <p className="text-xs mt-1 opacity-70">
+                    {message.time}
+                    {message.isBot && ` • ${(message.duration / 1000).toFixed(1)} sec`}
+                  </p>
                 </div>
               ) : (
                 <div className="max-w-[80%] md:max-w-[70%] rounded-lg p-3 bg-blue-600 shadow-md break-words whitespace-pre-wrap leading-relaxed">
@@ -287,7 +369,7 @@ const ChatBot = () => {
             transition={{ duration: 0.3 }}
             className="flex justify-start"
           >
-            <div className="bg-gray-600 text-white rounded-lg p-3 shadow-md backdrop-blur-sm bg-opacity-50">
+            <div className="bg-gray-600 text-white rounded-lg p-3 shadow-md">
               <div className="flex items-center space-x-2">
                 <span>Wait, Orion is thinking deeply</span>
                 <div className="flex space-x-1">
@@ -317,14 +399,12 @@ const ChatBot = () => {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input Form */}
-      <div className="border-t border-gray-700 p-4 bg-gray-800">
-        <form onSubmit={(e) => {
-          e.preventDefault();
-          handleSendMessage(inputMessage, pendingFiles);
-        }} className="space-y-2">
+      {/* Bottom Input Container */}
+      <div className="border-t border-gray-700 bg-gray-800">
+        {/* Main Input Area - Now at the top */}
+        <div className="p-3">
           {pendingFiles.length > 0 && (
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2 mb-2">
               {pendingFiles.map((file, index) => (
                 <div key={index} className="relative">
                   {file.type.startsWith('image/') ? (
@@ -343,7 +423,7 @@ const ChatBot = () => {
                     }}
                     className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors"
                   >
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor" className="w-4 h-4">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor" className="w-3 h-3">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                     </svg>
                   </button>
@@ -351,76 +431,135 @@ const ChatBot = () => {
               ))}
             </div>
           )}
+          
+          <textarea
+            ref={textareaRef}
+            value={inputMessage}
+            onChange={(e) => {
+              setInputMessage(e.target.value);
+              e.target.style.height = "auto";
+              e.target.style.height = `${e.target.scrollHeight}px`;
+            }}
+            placeholder="Message Orion...."
+            className="w-full border border-gray-600 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-700 text-white resize-none overflow-hidden transition-all duration-500 ease-in-out hover:border-blue-500"
+            rows={1}
+            autoFocus
+          />
+        </div>
 
-          <div className="flex space-x-2 items-end">
+        {/* Input Header with Controls - Now below input */}
+        <div className="flex items-center justify-between p-2 bg-gray-700 border-t border-gray-600">
+          <div className="flex items-center space-x-2">
             <button
               type="button"
               onClick={() => setShowFileOptions(!showFileOptions)}
-              className="flex items-center justify-center bg-gray-700 text-white p-2 rounded-full hover:bg-gray-600 transition-colors"
+              className="flex items-center justify-center bg-gray-600 text-white p-2 rounded-full hover:bg-gray-500 transition-colors"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor" className="w-6 h-6">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor" className="w-5 h-5">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
               </svg>
             </button>
-            <textarea
-              ref={textareaRef}
-              value={inputMessage}
-              onChange={(e) => {
-                setInputMessage(e.target.value);
-                e.target.style.height = "auto";
-                e.target.style.height = `${e.target.scrollHeight}px`;
-              }}
-              placeholder="Message Orion...."
-              className="flex-1 border border-gray-600 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-700 text-white resize-none overflow-hidden transition-all duration-500 ease-in-out hover:border-blue-500"
-              rows={1}
-              autoFocus
-            />
+            
+            <div className="relative">
+              <button
+                onClick={() => setShowMemoryPanel(!showMemoryPanel)}
+                className="flex items-center space-x-1 bg-gray-600 text-white px-3 py-1 rounded-full hover:bg-gray-500 transition-colors text-xs"
+              >
+                <span>Memory v2</span>
+                <span>⋯</span>
+              </button>
+              
+              {showMemoryPanel && (
+                <div className="absolute bottom-full mb-2 left-0 w-64 bg-gray-700 rounded-lg shadow-lg z-20 p-3 max-h-96 overflow-y-auto">
+                  <div className="flex justify-between items-center mb-2">
+                    <h4 className="font-bold">Essential Context</h4>
+                    <button 
+                      onClick={() => setShowMemoryPanel(false)}
+                      className="text-gray-400 hover:text-white"
+                    >
+                      ×
+                    </button>
+                  </div>
+                  
+                  {memories.length === 0 ? (
+                    <p className="text-sm text-gray-400">No important context yet</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {memories.map((memory) => (
+                        <div key={memory.id} className="bg-gray-600 p-2 rounded-lg">
+                          <div className="flex justify-between items-start">
+                            <p className="text-xs break-words">{memory.summary}</p>
+                            <button
+                              onClick={() => deleteMemory(memory.id)}
+                              className="text-gray-400 hover:text-red-400 text-xs"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                          <p className="text-xs text-gray-400 mt-1">{memory.date}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+            
             <button
-              type="submit"
-              disabled={(!inputMessage.trim() && pendingFiles.length === 0) || isBotTyping}
-              className="flex items-center justify-center bg-gradient-to-r from-blue-500 to-blue-700 text-white p-2 rounded-full font-semibold shadow-md hover:from-blue-600 hover:to-blue-800 hover:shadow-lg active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
+              onClick={startNewConversation}
+              className="flex items-center space-x-1 bg-gray-600 text-white px-3 py-1 rounded-full hover:bg-gray-500 transition-colors text-xs"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor" className="w-6 h-6">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-              </svg>
+              <span>New Chat</span>
             </button>
           </div>
-          {showFileOptions && (
-            <div className="flex space-x-2">
-              <button
-                type="button"
-                onClick={() => document.getElementById('image-upload').click()}
-                className="flex items-center justify-center bg-gray-700 text-white p-2 rounded-full hover:bg-gray-600 transition-colors"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor" className="w-6 h-6">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
-                </svg>
-              </button>
-              <input
-                id="image-upload"
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={handleFileUpload}
-              />
-              <button
-                type="button"
-                onClick={() => document.getElementById('file-upload').click()}
-                className="flex items-center justify-center bg-gray-700 text-white p-2 rounded-full hover:bg-gray-600 transition-colors"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor" className="w-6 h-6">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M18.375 12.739l-7.693 7.693a4.5 4.5 0 01-6.364-6.364l10.94-10.94A3 3 0 1119.5 7.372L8.552 18.32m.009-.01l-.01.01m5.699-9.941l-7.81 7.81a1.5 1.5 0 002.112 2.13" />
-                </svg>
-              </button>
-              <input
-                id="file-upload"
-                type="file"
-                className="hidden"
-                onChange={handleFileUpload}
-              />
-            </div>
-          )}
-        </form>
+          
+          <button
+            onClick={() => handleSendMessage(inputMessage, pendingFiles)}
+            disabled={(!inputMessage.trim() && pendingFiles.length === 0) || isBotTyping}
+            className="flex items-center justify-center bg-gradient-to-r from-blue-500 to-blue-700 text-white p-2 rounded-full font-semibold shadow-md hover:from-blue-600 hover:to-blue-800 hover:shadow-lg active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor" className="w-5 h-5">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
+            </svg>
+          </button>
+        </div>
+        
+        {/* File Options */}
+        {showFileOptions && (
+          <div className="flex space-x-2 p-2 border-t border-gray-700">
+            <button
+              type="button"
+              onClick={() => document.getElementById('image-upload').click()}
+              className="flex items-center justify-center bg-gray-700 text-white p-2 rounded-full hover:bg-gray-600 transition-colors"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor" className="w-5 h-5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
+              </svg>
+            </button>
+            <input
+              id="image-upload"
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleFileUpload}
+            />
+            <button
+              type="button"
+              onClick={() => document.getElementById('file-upload').click()}
+              className="flex items-center justify-center bg-gray-700 text-white p-2 rounded-full hover:bg-gray-600 transition-colors"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor" className="w-5 h-5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M18.375 12.739l-7.693 7.693a4.5 4.5 0 01-6.364-6.364l10.94-10.94A3 3 0 1119.5 7.372L8.552 18.32m.009-.01l-.01.01m5.699-9.941l-7.81 7.81a1.5 1.5 0 002.112 2.13" />
+              </svg>
+            </button>
+            <input
+              id="file-upload"
+              type="file"
+              className="hidden"
+              onChange={handleFileUpload}
+            />
+          </div>
+        )}
       </div>
     </div>
   );
