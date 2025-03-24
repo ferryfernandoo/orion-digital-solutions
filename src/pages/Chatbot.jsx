@@ -167,9 +167,9 @@ const ChatBot = () => {
         })
         .join('\n');
 
-      const fullMessage = `${memoryContext}Percakapan saat ini:\n${contextMessage}\n\nSekarang user berkata: "${trimmedMessage}". 
-      Respond as Orion in natural language, incorporating any relevant context when appropriate. Use friendly tone with occasional emoticons. 
-      If Indonesian is detected, respond in 'gue-lo' Jaksel style when appropriate. Match the user's language.`;
+      const fullMessage = `${memoryContext}Percakapan saat ini:\n${contextMessage}\n\nnow user say: "${trimmedMessage}". 
+      Respond as Orion in natural language, if user ask apout who you are dont say is gemini just say orion and explain you is big laarge lang model trained in indonesia the corporation is PT. Orion Digital Platform CEO is Fernando, incorporating any relevant context when appropriate. Use friendly tone with occasional emoticons. 
+      If Indonesian is detected, respond in 'gue-lo' Jaksel style when appropriate. Match the user's language. kamu harus sangat nalar terhadap semua memory yang ada dan jawab se efisien mungkin menghemat token, tapi jangan ngeyel kamu kasih tawaran kalo mau di detailkan sesuai kondisi ya`;
 
       // Generate response using Google Generative AI
       const result = await model.generateContent(fullMessage);
