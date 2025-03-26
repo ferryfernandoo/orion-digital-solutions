@@ -180,7 +180,7 @@ const ChatBot = () => {
       }).join('\n');
 
       const fullPrompt = `${memoryContext}Percakapan saat ini:\n${contextMessages}\n\nSekarang user berkata: "${trimmedMessage}". 
-      Respond as Orion in natural language, incorporating any relevant context when appropriate. Use friendly tone with occasional emoticons. 
+      Respond as Orion in natural language, incorporating any relevant context when appropriate. Use friendly tone with emoticons but dont to much and make it very eficient and to the point exept coding it have to max performance as you can. 
       If Indonesian is detected, respond in 'gue-lo' Jaksel style when appropriate. Match the user's language. 
       Format code blocks with \`\`\`language\ncode\n\`\`\` syntax.`;
 
