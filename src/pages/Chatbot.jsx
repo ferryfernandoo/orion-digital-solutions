@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+      "x.   Xx ximport React, { useState, useEffect, useRef } from 'react';
 import PropTypes from 'prop-types';
 import DOMPurify from 'dompurify';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -283,7 +283,7 @@ const ChatBot = () => {
             </div>
 
             <h3 className="text-3xl md:text-5xl font-bold text-center mb-6">
-              Hey, I'm Orion! Here to brighten your day! ✨
+              Hey, I'm Orion! Here to brighten your day☺️✌️! ✨
             </h3>
           </>
         )}
@@ -470,7 +470,7 @@ const ChatBot = () => {
                 onClick={() => setShowMemoryPanel(!showMemoryPanel)}
                 className="flex items-center space-x-1 bg-gray-600 text-white px-3 py-1 rounded-full hover:bg-gray-500 transition-colors text-xs"
               >
-                <span>Memory</span>
+                <span>Memoryzen V1</span>
                 <span>⋯</span>
               </button>
               
