@@ -376,7 +376,7 @@ const ChatBot = () => {
           >
             <div className="bg-gray-600 text-white rounded-lg p-3 shadow-md">
               <div className="flex items-center space-x-2">
-                <span>Wait, Orion is thinking deeply</span>
+                <span>Wait, Orion is thinking deeply☺️🙏</span>
                 <div className="flex space-x-1">
                   <motion.span
                     animate={{ opacity: [0, 1, 0] }}
