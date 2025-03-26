@@ -1,4 +1,4 @@
- import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import PropTypes from 'prop-types';
 import DOMPurify from 'dompurify';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -62,7 +62,7 @@ const ChatBot = () => {
 
   const summarizeConversation = async (conversation) => {
     try {
-      const prompt = `Buat ringkasan sangat singkat sepadat padatnya dan se hemat hematnya token (maks 1 kalimat) dari percakapan ini dalam bahasa yang sama dengan percakapan. Fokus pada fakta kunci, keputusan, dan detail penting. HILANGKAN semua salam dan basa-basi.\n\nPercakapan:\n${conversation}`;
+      const prompt = `Buat ringkasan sangat singkat sepadat padatnya (maks 1 kalimat) dari percakapan ini dalam bahasa yang sama dengan percakapan. Fokus pada fakta kunci, keputusan, dan detail penting. HILANGKAN semua salam dan basa-basi.\n\nPercakapan:\n${conversation}`;
       
       const result = await model.generateContent(prompt);
       const response = await result.response.text();
@@ -179,18 +179,10 @@ const ChatBot = () => {
         return msg.role === 'user' ? `User: ${msg.content}` : `Orion: ${msg.content}`;
       }).join('\n');
 
-    You said:
-You said:
-const fullPrompt = ${memoryContext}Percakapan saat ini:\n${contextMessages}\n\nSekarang user berkata: "${trimmedMessage}".    
-     Respond as Orion in natural language, incorporating any relevant context when appropriate. Use friendly tone with occasional emoticons.       
-     If Indonesian is detected, respond in 'gue-lo' Jaksel style when appropriate. Match the user's language.   
-     Format code blocks with \\\language\ncode\n\\\ syntax.;
-
-
-
-
-
-
+      const fullPrompt = `${memoryContext}Percakapan saat ini:\n${contextMessages}\n\nSekarang user berkata: "${trimmedMessage}". 
+      Respond as Orion in natural language, incorporating any relevant context when appropriate. Use friendly tone with occasional emoticons. 
+      If Indonesian is detected, respond in 'gue-lo' Jaksel style when appropriate. Match the user's language. 
+      Format code blocks with \`\`\`language\ncode\n\`\`\` syntax.`;
 
       // Generate response using Google Generative AI
       const result = await model.generateContent(fullPrompt);
