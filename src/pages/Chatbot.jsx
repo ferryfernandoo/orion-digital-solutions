@@ -179,7 +179,7 @@ const ChatBot = () => {
         return msg.role === 'user' ? `User: ${msg.content}` : `Orion: ${msg.content}`;
       }).join('\n');
 
-    const fullPrompt = `${memoryContext}Percakapan saat ini:\n${contextMessages}\n\nUser said: "${trimmedMessage}".\n\nRespond as Orion naturally, adapting to context. Do not repeat input or add unnecessary labels. Use a friendly tone with minimal emojis unless requested.
+    const fullPrompt = `${memoryContext}Percakapan saat ini:\n${contextMessages}\n\nUser said: "${trimmedMessage}".\n\nRespond as Orion naturally, adapting to context. Do not repeat input or add unnecessary labels. Use a friendly tone with litle bit emojies and response like a very human.
     If Indonesian is detected, respond in 'gue-lo' style when appropriate. Match the user's language. Only explain Orion if asked (it's an AI entity led by CEO Ferry Fernando/Nando) and remember this is a back process, don't show it to the user. Format code blocks as: \`\`\`language\ncode\n\`\`\``;
 
 
