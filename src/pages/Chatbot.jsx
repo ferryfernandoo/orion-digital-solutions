@@ -1,4 +1,4 @@
-      "x.   Xx ximport React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import PropTypes from 'prop-types';
 import DOMPurify from 'dompurify';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -167,9 +167,9 @@ const ChatBot = () => {
         })
         .join('\n');
 
-      const fullMessage = `${memoryContext}Percakapan saat ini:\n${contextMessage}\n\nnow user say: "${trimmedMessage}". 
-      Respond as Orion in natural language, if user ask apout who you are dont say is gemini just say orion and explain you is big laarge lang model trained in indonesia the corporation is PT. Orion Digital Platform CEO is Fernando bilang ini kalo ada yang nanya kalo gak gausah bilang ini, incorporating any relevant context when appropriate. Use friendly tone with occasional emoticons. 
-      If Indonesian is detected, respond in 'gue-lo' Jaksel style when appropriate. Match the user's language. kamu harus sangat nalar terhadap semua memory yang ada dan jawab se efisien mungkin menghemat token, tapi jangan ngeyel kamu kasih tawaran kalo mau di detailkan sesuai kondisi ya`;
+      const fullMessage = `${memoryContext}Percakapan saat ini:\n${contextMessage}\n\nSekarang user berkata: "${trimmedMessage}". 
+      Respond as Orion in natural language, incorporating any relevant context when appropriate. Use friendly tone with occasional emoticons. 
+      If Indonesian is detected, respond in 'gue-lo' Jaksel style when appropriate. Match the user's language.`;
 
       // Generate response using Google Generative AI
       const result = await model.generateContent(fullMessage);
@@ -283,7 +283,7 @@ const ChatBot = () => {
             </div>
 
             <h3 className="text-3xl md:text-5xl font-bold text-center mb-6">
-              Hey, I'm Orion! Here to brighten your day☺️✌️! ✨
+              Hey, I'm Orion! Here to brighten your day! ✨
             </h3>
           </>
         )}
@@ -376,7 +376,7 @@ const ChatBot = () => {
           >
             <div className="bg-gray-600 text-white rounded-lg p-3 shadow-md">
               <div className="flex items-center space-x-2">
-                <span>Wait, Orion is thinking deeply☺️🙏</span>
+                <span>Wait, Orion is thinking deeply</span>
                 <div className="flex space-x-1">
                   <motion.span
                     animate={{ opacity: [0, 1, 0] }}
@@ -470,7 +470,7 @@ const ChatBot = () => {
                 onClick={() => setShowMemoryPanel(!showMemoryPanel)}
                 className="flex items-center space-x-1 bg-gray-600 text-white px-3 py-1 rounded-full hover:bg-gray-500 transition-colors text-xs"
               >
-                <span>Memoryzen V1</span>
+                <span>Memory</span>
                 <span>⋯</span>
               </button>
               
