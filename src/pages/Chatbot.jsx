@@ -54,7 +54,7 @@ const ChatBot = () => {
 
   const summarizeConversation = async (conversation) => {
     try {
-      const prompt = `Buat ringkasan sangat singkat (maks 2 kalimat) dari percakapan ini dalam bahasa yang sama dengan percakapan. Fokus pada fakta kunci, keputusan, dan detail penting. HILANGKAN semua salam dan basa-basi.\n\nPercakapan:\n${conversation}`;
+      const prompt = `Buat ringkasan sangat singkat sepadat padatnya (maks 1 kalimat) dari percakapan ini dalam bahasa yang sama dengan percakapan. Fokus pada fakta kunci, keputusan, dan detail penting. HILANGKAN semua salam dan basa-basi.\n\nPercakapan:\n${conversation}`;
       
       const result = await model.generateContent(prompt);
       const response = await result.response.text();
@@ -470,14 +470,14 @@ const ChatBot = () => {
                 onClick={() => setShowMemoryPanel(!showMemoryPanel)}
                 className="flex items-center space-x-1 bg-gray-600 text-white px-3 py-1 rounded-full hover:bg-gray-500 transition-colors text-xs"
               >
-                <span>Memory</span>
+                <span>Memoryzen V1</span>
                 <span>⋯</span>
               </button>
               
               {showMemoryPanel && (
                 <div className="absolute bottom-full mb-2 left-0 w-64 bg-gray-700 rounded-lg shadow-lg z-20 p-3 max-h-96 overflow-y-auto">
                   <div className="flex justify-between items-center mb-2">
-                    <h4 className="font-bold">Essential Context</h4>
+                    <h4 className="font-bold">Importannt Memory</h4>
                     <button 
                       onClick={() => setShowMemoryPanel(false)}
                       className="text-gray-400 hover:text-white"
