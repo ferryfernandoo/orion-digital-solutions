@@ -98,7 +98,7 @@ const ChatBot = () => {
             <span className="text-xl">🤖</span>
           </div>
           <div>
-            <h2 className="font-bold">Hey, I'm Orion! Here to brighten your day! ✨</h2>
+            <h2 className="font-bold">Hey, I'm Orion! Here to brighten your day! ☺️✌️</h2>
             <p className="text-sm opacity-75">
               {isBotTyping ? 'Typing...' : 'Online'}
             </p>
