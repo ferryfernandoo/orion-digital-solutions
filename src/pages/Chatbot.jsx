@@ -607,7 +607,7 @@ N1 for memory technology, model lite preview free llm pre trained and training i
                         disabled={messages.length === 0}
                         className="text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded transition-colors disabled:opacity-50"
                       >
-                        Save Current
+                        Remember current
                       </button>
                       <button 
                         onClick={() => setShowMemoryPanel(false)}
