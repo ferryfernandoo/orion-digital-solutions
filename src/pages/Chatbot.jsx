@@ -469,3 +469,296 @@ N1 for memory technology, model lite preview free llm pre trained and training i
               <div className="flex items-center space-x-2">
                 <div className="flex space-x-1">
                   <motion.span
+className="typing-dot"
+                    animate={{ opacity: [0.2, 1, 0.2] }}
+                    transition={{ duration: 1.2, repeat: Infinity }}
+                  />
+                  <motion.span
+                    className="typing-dot"
+                    animate={{ opacity: [0.2, 1, 0.2] }}
+                    transition={{ duration: 1.2, repeat: Infinity, delay: 0.3 }}
+                  />
+                  <motion.span
+                    className="typing-dot"
+                    animate={{ opacity: [0.2, 1, 0.2] }}
+                    transition={{ duration: 1.2, repeat: Infinity, delay: 0.6 }}
+                  />
+                </div>
+                <span className="text-sm text-gray-300">Thinking deeply...</span>
+              </div>
+            </div>
+          </motion.div>
+        )}
+        <div ref={messagesEndRef} />
+      </div>
+
+      {/* Bottom Input Container */}
+      <div className="border-t border-gray-800 bg-gray-900/80 backdrop-blur-lg">
+        {/* File Preview */}
+        {pendingFiles.length > 0 && (
+          <div className="flex items-center space-x-2 p-3 border-b border-gray-800 overflow-x-auto scrollbar-thin">
+            {pendingFiles.map((file, index) => (
+              <div key={index} className="relative flex-shrink-0">
+                <div className="w-16 h-16 flex items-center justify-center bg-gray-800 rounded-lg border border-gray-700 overflow-hidden">
+                  {file.type.startsWith('image/') ? (
+                    <img 
+                      src={URL.createObjectURL(file)} 
+                      alt="Preview" 
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="p-2 text-center">
+                      <FiFile size={20} className="mx-auto text-gray-400" />
+                      <p className="text-xs mt-1 truncate w-14">{file.name.split('.')[0]}</p>
+                    </div>
+                  )}
+                </div>
+                <button
+                  onClick={() => {
+                    const newFiles = [...pendingFiles];
+                    newFiles.splice(index, 1);
+                    setPendingFiles(newFiles);
+                  }}
+                  className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 hover:bg-red-600 transition-colors"
+                >
+                  <FiX size={12} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+        
+        {/* Main Input Area */}
+        <div className="p-3">
+          <div className="relative">
+            <textarea
+              ref={textareaRef}
+              value={inputMessage}
+              onChange={(e) => {
+                setInputMessage(e.target.value);
+                e.target.style.height = "auto";
+                e.target.style.height = `${Math.min(e.target.scrollHeight, 150)}px`;
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSendMessage(inputMessage, pendingFiles);
+                }
+              }}
+              placeholder="Message Orion..."
+              className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 pr-12 focus:outline-none focus:ring-2 focus:ring-blue-500/50 text-white resize-none overflow-hidden transition-all duration-200 hover:border-gray-600"
+              rows={1}
+              style={{ minHeight: '44px', maxHeight: '150px' }}
+            />
+            
+            <div className="absolute right-3 bottom-3 flex items-center space-x-1">
+              {inputMessage && (
+                <button
+                  onClick={() => setInputMessage('')}
+                  className="p-1 text-gray-400 hover:text-white rounded-full transition-colors"
+                >
+                  <FiX size={18} />
+                </button>
+              )}
+              
+              <button
+                onClick={() => handleSendMessage(inputMessage, pendingFiles)}
+                disabled={(!inputMessage.trim() && pendingFiles.length === 0) || isBotTyping}
+                className={`p-1.5 rounded-full transition-all ${inputMessage.trim() || pendingFiles.length > 0 ? 
+                  'bg-blue-500 hover:bg-blue-600 text-white' : 
+                  'text-gray-500 hover:text-gray-300'}`}
+              >
+                <FiSend size={18} />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Input Footer */}
+        <div className="flex items-center justify-between p-2 bg-gray-800/50 border-t border-gray-800">
+          <div className="flex items-center space-x-1">
+            <button
+              onClick={() => setShowFileOptions(!showFileOptions)}
+              className="p-2 text-gray-400 hover:text-white rounded-full transition-colors"
+            >
+              <FiPlus size={18} />
+            </button>
+            
+            <div className="relative">
+              <button
+                onClick={() => setShowMemoryPanel(!showMemoryPanel)}
+                className="p-2 text-gray-400 hover:text-white rounded-full transition-colors flex items-center"
+              >
+                <FiClock size={18} />
+                {memories.length > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-blue-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">
+                    {memories.length > 9 ? '9+' : memories.length}
+                  </span>
+                )}
+              </button>
+              
+              {showMemoryPanel && (
+                <div className="absolute bottom-full mb-2 left-0 w-72 bg-gray-800 rounded-xl shadow-xl z-20 border border-gray-700 overflow-hidden">
+                  <div className="p-3 border-b border-gray-700 flex justify-between items-center">
+                    <h4 className="font-medium">Conversation Memory</h4>
+                    <div className="flex items-center space-x-2">
+                      <button 
+                        onClick={saveToMemory}
+                        disabled={messages.length === 0}
+                        className="text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded transition-colors disabled:opacity-50"
+                      >
+                        Remember current
+                      </button>
+                      <button 
+                        onClick={() => setShowMemoryPanel(false)}
+                        className="text-gray-400 hover:text-white p-1"
+                      >
+                        <FiX size={16} />
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <div className="max-h-64 overflow-y-auto">
+                    {memories.length === 0 ? (
+                      <div className="p-4 text-center text-sm text-gray-400">
+                        No memories yet. Important context will appear here.
+                      </div>
+                    ) : (
+                      <div className="divide-y divide-gray-700">
+                        {memories.map((memory) => (
+                          <div key={memory.id} className="p-3 hover:bg-gray-700/50 transition-colors group">
+                            <div className="flex justify-between items-start">
+                              <p className="text-sm break-words pr-2">{memory.summary}</p>
+                              <button
+                                onClick={() => deleteMemory(memory.id)}
+                                className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-400 text-xs transition-opacity"
+                              >
+                                <FiTrash2 size={14} />
+                              </button>
+                            </div>
+                            <p className="text-xs text-gray-500 mt-1">{memory.date}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+          
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={startNewConversation}
+              className="text-xs bg-gray-700 hover:bg-gray-600 px-3 py-1.5 rounded-lg transition-colors flex items-center"
+            >
+              <span>New Chat</span>
+            </button>
+          </div>
+        </div>
+        
+        {/* File Options */}
+        {showFileOptions && (
+          <div className="flex space-x-2 p-2 border-t border-gray-800 bg-gray-800/50">
+            <label className="cursor-pointer p-2 text-gray-400 hover:text-white rounded-full transition-colors">
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleFileUpload}
+              />
+              <FiImage size={18} />
+            </label>
+            <label className="cursor-pointer p-2 text-gray-400 hover:text-white rounded-full transition-colors">
+              <input
+                type="file"
+                className="hidden"
+                onChange={handleFileUpload}
+              />
+              <FiFile size={18} />
+            </label>
+          </div>
+        )}
+      </div>
+      
+      <style jsx>{`
+        .typing-dot {
+          display: inline-block;
+          width: 6px;
+          height: 6px;
+          background-color: #9CA3AF;
+          border-radius: 50%;
+        }
+        .code-block {
+          background: #1E1E1E;
+          border-radius: 6px;
+          margin: 1em 0;
+          overflow: hidden;
+        }
+        .code-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 0.5em 1em;
+          background: #252526;
+          color: #9CDCFE;
+          font-size: 0.8em;
+        }
+        .code-header .copy-btn {
+          background: transparent;
+          border: none;
+          color: #D4D4D4;
+          cursor: pointer;
+          padding: 0.2em;
+        }
+        .code-header .copy-btn:hover {
+          color: white;
+        }
+        .code-block pre {
+          margin: 0;
+          padding: 1em;
+          overflow-x: auto;
+        }
+        .code-block code {
+          font-family: 'Courier New', monospace;
+          color: #D4D4D4;
+          font-size: 0.9em;
+        }
+        .copy-notification {
+          position: fixed;
+          bottom: 20px;
+          left: 50%;
+          transform: translateX(-50%);
+          background: rgba(0, 0, 0, 0.8);
+          color: white;
+          padding: 8px 16px;
+          border-radius: 20px;
+          font-size: 14px;
+          z-index: 1000;
+          animation: fadeInOut 2s ease-in-out;
+        }
+        @keyframes fadeInOut {
+          0% { opacity: 0; }
+          20% { opacity: 1; }
+          80% { opacity: 1; }
+          100% { opacity: 0; }
+        }
+      `}</style>
+    </div>
+  );
+};
+
+ChatBot.propTypes = {
+  messages: PropTypes.arrayOf(
+    PropTypes.shape({
+      id: PropTypes.string.isRequired,
+      text: PropTypes.string.isRequired,
+      isBot: PropTypes.bool.isRequired,
+      time: PropTypes.string.isRequired,
+      duration: PropTypes.number,
+      file: PropTypes.object,
+    })
+  ),
+};
+
+export default ChatBot;
