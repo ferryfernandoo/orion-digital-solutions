@@ -99,10 +99,10 @@ const ChatBot = () => {
           id: Date.now().toString(),
           summary: summary,
           date: new Date().toLocaleString(),
-          messages: [...messages].slice(-5) // Save last 5 messages
+          messages: [...messages].slice(-2) // Save last 2 messages
         };
         
-        const updatedMemories = [newMemory, ...memories].slice(0, 20); // Keep 20 latest memories
+        const updatedMemories = [newMemory, ...memories].slice(0, 500); // Keep 500 latest memories
         setMemories(updatedMemories);
         localStorage.setItem('orionMemories', JSON.stringify(updatedMemories));
       }
@@ -592,7 +592,7 @@ className="typing-dot"
                 <FiClock size={18} />
                 {memories.length > 0 && (
                   <span className="absolute -top-1 -right-1 bg-blue-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">
-                    {memories.length > 9 ? '9+' : memories.length}
+                    {memories.length > 99 ? '99+' : memories.length}
                   </span>
                 )}
               </button>
