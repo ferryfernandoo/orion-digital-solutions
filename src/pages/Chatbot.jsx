@@ -20,9 +20,11 @@ const ChatBot = () => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showFormattingToolbar, setShowFormattingToolbar] = useState(false);
+  const [isTypingSoundPlaying, setIsTypingSoundPlaying] = useState(false);
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
-
+  const typingSoundRef = useRef(null);
+  const sendSoundRef = useRef(null);
 
   // Initialize Google Generative AI
   const genAI = new GoogleGenerativeAI("AIzaSyDSTgkkROL7mjaGKoD2vnc8l2UptNCbvHk");
@@ -41,7 +43,14 @@ const ChatBot = () => {
       setChatHistory(JSON.parse(savedChatHistory));
     }
 
-   
+    // Initialize audio
+    typingSoundRef.current = new Audio('https://assets.mixkit.co/sfx/preview/mixkit-typing-with-mechanical-keyboard-1384.mp3');
+    typingSoundRef.current.loop = true;
+    typingSoundRef.current.volume = 0.2;
+    
+    sendSoundRef.current = new Audio('https://assets.mixkit.co/sfx/preview/mixkit-positive-interface-beep-221.mp3');
+    sendSoundRef.current.volume = 0.3;
+  }, []);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({
@@ -844,208 +853,4 @@ const ChatBot = () => {
                       >
                         <FiX size={16} />
                       </button>
-                    </div>
-                  </div>
-                  
-                  <div className="max-h-64 overflow-y-auto scrollbar-thin">
-                    {memories.length === 0 ? (
-                      <div className="p-4 text-center text-sm text-gray-400">
-                        No memories yet. Important context will appear here.
-                      </div>
-                    ) : (
-                      <div className="divide-y divide-gray-700">
-                        {memories.map((memory) => (
-                          <motion.div 
-                            key={memory.id} 
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            className="p-3 hover:bg-gray-700/50 transition-colors group"
-                          >
-                            <div className="flex justify-between items-start">
-                              <p className="text-sm break-words pr-2">{memory.summary}</p>
-                              <button
-                                onClick={() => deleteMemory(memory.id)}
-                                className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-400 text-xs transition-opacity"
-                              >
-                                <FiTrash2 size={14} />
-                              </button>
-                            </div>
-                            <p className="text-xs text-gray-500 mt-1">{memory.date}</p>
-                          </motion.div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </motion.div>
-              )}
-            </div>
-          </div>
-          
-          <div className="flex items-center space-x-2">
-            <motion.button
-              onClick={startNewConversation}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              className="text-xs bg-gray-700 hover:bg-gray-600 px-3 py-1.5 rounded-lg transition-colors flex items-center"
-            >
-              <span>New Chat</span>
-            </motion.button>
-          </div>
-        </div>
-        
-        {/* File Options */}
-        {showFileOptions && (
-          <motion.div 
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            className="flex space-x-2 p-2 border-t border-gray-800 bg-gray-800/50"
-          >
-            <label className="cursor-pointer p-2 text-gray-400 hover:text-white rounded-full transition-colors">
-              <input
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={handleFileUpload}
-              />
-              <FiImage size={18} />
-            </label>
-            <label className="cursor-pointer p-2 text-gray-400 hover:text-white rounded-full transition-colors">
-              <input
-                type="file"
-                className="hidden"
-                onChange={handleFileUpload}
-              />
-              <FiFile size={18} />
-            </label>
-          </motion.div>
-        )}
-      </div>
-      
-      <style jsx global>{`
-        .typing-dot {
-          display: inline-block;
-          width: 6px;
-          height: 6px;
-          background-color: #9CA3AF;
-          border-radius: 50%;
-        }
-        .code-container {
-          background: #1E1E1E;
-          border-radius: 8px;
-          margin: 1em 0;
-          overflow: hidden;
-          border: 1px solid #333;
-        }
-        .code-toolbar {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          padding: 0.5em 1em;
-          background: #252526;
-          color: #9CDCFE;
-          font-size: 0.8em;
-        }
-        .language-tag {
-          background: #333;
-          padding: 0.2em 0.5em;
-          border-radius: 4px;
-          font-size: 0.8em;
-        }
-        .copy-button {
-          background: transparent;
-          border: 1px solid #555;
-          color: #D4D4D4;
-          cursor: pointer;
-          padding: 0.2em 0.5em;
-          border-radius: 4px;
-          font-size: 0.8em;
-          display: flex;
-          align-items: center;
-          gap: 0.3em;
-        }
-        .copy-button:hover {
-          background: #333;
-        }
-        .code-block {
-          margin: 0;
-          padding: 1em;
-          overflow-x: auto;
-          font-family: 'Fira Code', 'Courier New', monospace;
-          font-size: 0.9em;
-          line-height: 1.5;
-          color: #D4D4D4;
-          background: #1E1E1E;
-        }
-        .code-block code {
-          font-family: inherit;
-        }
-        .copy-notification {
-          position: fixed;
-          bottom: 20px;
-          left: 50%;
-          transform: translateX(-50%);
-          background: rgba(0, 0, 0, 0.8);
-          color: white;
-          padding: 8px 16px;
-          border-radius: 20px;
-          font-size: 14px;
-          z-index: 1000;
-          animation: fadeInOut 2s ease-in-out;
-        }
-        @keyframes fadeInOut {
-          0% { opacity: 0; }
-          20% { opacity: 1; }
-          80% { opacity: 1; }
-          100% { opacity: 0; }
-        }
-        .prose {
-          max-width: 100%;
-        }
-        .prose code:not(.code-block code) {
-          background: rgba(110, 118, 129, 0.4);
-          padding: 0.2em 0.4em;
-          border-radius: 4px;
-          font-size: 0.9em;
-        }
-        .prose pre {
-          margin: 0;
-        }
-        .prose ul, .prose ol {
-          padding-left: 1.5em;
-          margin: 0.5em 0;
-        }
-        .prose li {
-          margin: 0.25em 0;
-        }
-        .prose strong {
-          font-weight: 600;
-          color: #fff;
-        }
-        .prose em {
-          font-style: italic;
-        }
-        .prose u {
-          text-decoration: underline;
-        }
-        .prose s {
-          text-decoration: line-through;
-        }
-      `}</style>
-    </div>
-  );
-};
-
-ChatBot.propTypes = {
-  messages: PropTypes.arrayOf(
-    PropTypes.shape({
-      id: PropTypes.string.isRequired,
-      text: PropTypes.string.isRequired,
-      isBot: PropTypes.bool.isRequired,
-      time: PropTypes.string.isRequired,
-      duration: PropTypes.number,
-      file: PropTypes.object,
-    })
-  ),
-};
-
-export default ChatBot;
+                    </div
