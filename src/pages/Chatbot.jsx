@@ -3,14 +3,15 @@ import PropTypes from 'prop-types';
 import DOMPurify from 'dompurify';
 import { motion, AnimatePresence } from 'framer-motion';
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { FiCopy, FiSend, FiPlus, FiX, FiImage, FiFile, FiTrash2, FiClock, FiCpu, FiSettings } from 'react-icons/fi';
+import { FiCopy, FiSend, FiPlus, FiX, FiImage, FiFile, FiTrash2, FiClock, FiCpu, FiSettings, FiPause } from 'react-icons/fi';
+import { MdFormatBold, MdFormatItalic, MdFormatUnderlined, MdCode, MdStrikethroughS } from 'react-icons/md';
 
 const ChatBot = () => {
   const [messages, setMessages] = useState([]);
   const [inputMessage, setInputMessage] = useState('');
   const [isBotTyping, setIsBotTyping] = useState(false);
   const [showTemplateButtons, setShowTemplateButtons] = useState(true);
-  const [typingSpeed, setTypingSpeed] = useState(1); // ms per character
+  const [typingSpeed, setTypingSpeed] = useState(20); // words per chunk
   const [showFileOptions, setShowFileOptions] = useState(false);
   const [pendingFiles, setPendingFiles] = useState([]);
   const [chatHistory, setChatHistory] = useState([]);
@@ -18,8 +19,12 @@ const ChatBot = () => {
   const [memories, setMemories] = useState([]);
   const [isExpanded, setIsExpanded] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showFormattingToolbar, setShowFormattingToolbar] = useState(false);
+  const [isTypingSoundPlaying, setIsTypingSoundPlaying] = useState(false);
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
+  const typingSoundRef = useRef(null);
+  const sendSoundRef = useRef(null);
 
   // Initialize Google Generative AI
   const genAI = new GoogleGenerativeAI("AIzaSyDSTgkkROL7mjaGKoD2vnc8l2UptNCbvHk");
@@ -37,6 +42,14 @@ const ChatBot = () => {
     if (savedChatHistory) {
       setChatHistory(JSON.parse(savedChatHistory));
     }
+
+    // Initialize audio
+    typingSoundRef.current = new Audio('https://assets.mixkit.co/sfx/preview/mixkit-typing-with-mechanical-keyboard-1384.mp3');
+    typingSoundRef.current.loop = true;
+    typingSoundRef.current.volume = 0.2;
+    
+    sendSoundRef.current = new Audio('https://assets.mixkit.co/sfx/preview/mixkit-positive-interface-beep-221.mp3');
+    sendSoundRef.current.volume = 0.3;
   }, []);
 
   const scrollToBottom = () => {
@@ -124,11 +137,29 @@ const ChatBot = () => {
 
   const typeMessage = async (fullText, callback) => {
     let displayedText = '';
-    for (let i = 0; i < fullText.length; i++) {
-      displayedText += fullText[i];
+    const words = fullText.split(/(\s+)/);
+    let chunkSize = typingSpeed;
+    
+    // Start typing sound
+    typingSoundRef.current.currentTime = 0;
+    typingSoundRef.current.play();
+    setIsTypingSoundPlaying(true);
+
+    for (let i = 0; i < words.length; i += chunkSize) {
+      if (!isBotTyping) break; // Stop if interrupted
+      
+      const chunk = words.slice(i, i + chunkSize).join('');
+      displayedText += chunk;
       callback(displayedText);
-      await new Promise(resolve => setTimeout(resolve, typingSpeed));
+      
+      // Randomize chunk size slightly for more natural typing
+      chunkSize = Math.max(1, typingSpeed + Math.floor(Math.random() * 5) - 2);
+      await new Promise(resolve => setTimeout(resolve, 30 + Math.random() * 50));
     }
+
+    // Stop typing sound
+    typingSoundRef.current.pause();
+    setIsTypingSoundPlaying(false);
   };
 
   const handleSendMessage = async (messageText, files = []) => {
@@ -139,6 +170,9 @@ const ChatBot = () => {
     const timeoutId = setTimeout(() => controller.abort(), 300000);
 
     try {
+      // Play send sound
+      sendSoundRef.current.play();
+
       // Add user message to chat history
       const userMessage = { role: 'user', content: trimmedMessage };
       const updatedHistory = [...chatHistory, userMessage];
@@ -159,6 +193,7 @@ const ChatBot = () => {
       setPendingFiles([]);
       setIsBotTyping(true);
       setShowTemplateButtons(false);
+      setShowFormattingToolbar(false);
 
       if (textareaRef.current) {
         textareaRef.current.style.height = 'auto';
@@ -287,6 +322,63 @@ const ChatBot = () => {
     localStorage.setItem('orionMemories', JSON.stringify(updatedMemories));
   };
 
+  const applyFormatting = (format) => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const selectedText = inputMessage.substring(start, end);
+    let newText = inputMessage;
+
+    const formattingMap = {
+      bold: { prefix: '**', suffix: '**' },
+      italic: { prefix: '*', suffix: '*' },
+      underline: { prefix: '_', suffix: '_' },
+      strikethrough: { prefix: '~~', suffix: '~~' },
+      code: { prefix: '`', suffix: '`' },
+    };
+
+    if (format in formattingMap) {
+      const { prefix, suffix } = formattingMap[format];
+      
+      if (selectedText) {
+        newText = 
+          inputMessage.substring(0, start) + 
+          prefix + selectedText + suffix + 
+          inputMessage.substring(end);
+      } else {
+        newText = 
+          inputMessage.substring(0, start) + 
+          prefix + suffix + 
+          inputMessage.substring(end);
+      }
+    } else if (format === 'newline') {
+      newText = 
+        inputMessage.substring(0, start) + 
+        '\n' + 
+        inputMessage.substring(end);
+    }
+
+    setInputMessage(newText);
+    setTimeout(() => {
+      textarea.focus();
+      if (selectedText) {
+        textarea.setSelectionRange(start, end + prefix.length + suffix.length);
+      } else {
+        textarea.setSelectionRange(start + prefix.length, start + prefix.length);
+      }
+    }, 0);
+  };
+
+  const interruptTyping = () => {
+    setIsBotTyping(false);
+    if (typingSoundRef.current) {
+      typingSoundRef.current.pause();
+      setIsTypingSoundPlaying(false);
+    }
+  };
+
   return (
     <div className={`flex flex-col h-screen bg-gradient-to-br from-gray-900 to-gray-800 text-white relative z-10 ${isExpanded ? 'w-full' : 'w-full max-w-4xl mx-auto rounded-xl shadow-2xl overflow-hidden'}`}>
       {/* Header */}
@@ -341,7 +433,13 @@ const ChatBot = () => {
 
       {/* Settings Panel */}
       {showSettings && (
-        <div className="absolute right-4 top-16 bg-gray-800/90 backdrop-blur-lg rounded-xl shadow-xl z-20 border border-gray-700 w-64">
+        <motion.div 
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -10 }}
+          transition={{ duration: 0.2 }}
+          className="absolute right-4 top-16 bg-gray-800/90 backdrop-blur-lg rounded-xl shadow-xl z-20 border border-gray-700 w-64"
+        >
           <div className="p-4 border-b border-gray-700">
             <h3 className="font-medium flex items-center">
               <FiSettings className="mr-2" /> Settings
@@ -354,13 +452,16 @@ const ChatBot = () => {
                 <span className="text-xs">Slow</span>
                 <input
                   type="range"
-                  min="20"
-                  max="5000"
-                  value={100 - typingSpeed}
-                  onChange={(e) => setTypingSpeed(5000 - parseInt(e.target.value))}
+                  min="1"
+                  max="50"
+                  value={typingSpeed}
+                  onChange={(e) => setTypingSpeed(parseInt(e.target.value))}
                   className="flex-1"
                 />
                 <span className="text-xs">Fast</span>
+              </div>
+              <div className="text-xs text-gray-400 mt-1">
+                Words per chunk: {typingSpeed}
               </div>
             </div>
             <button
@@ -370,16 +471,25 @@ const ChatBot = () => {
               Save Settings
             </button>
           </div>
-        </div>
+        </motion.div>
       )}
 
       {/* Chat Area */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-transparent">
         {messages.length === 0 && (
-          <div className="flex flex-col items-center justify-center h-full pb-16">
-            <div className="w-24 h-24 mb-6 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            className="flex flex-col items-center justify-center h-full pb-16"
+          >
+            <motion.div 
+              animate={{ rotate: 360 }}
+              transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+              className="w-24 h-24 mb-6 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center"
+            >
               <span className="text-4xl">✨</span>
-            </div>
+            </motion.div>
             <h3 className="text-3xl font-bold text-center mb-2">
               Hey, I'm Orion!
             </h3>
@@ -388,38 +498,50 @@ const ChatBot = () => {
             </p>
             
             {showTemplateButtons && (
-              <div className="grid grid-cols-2 gap-3 w-full max-w-md">
-                <button
-                  onClick={() => handleTemplateButtonClick("Hello Orion! How are you today?")}
-                  className="bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-xl p-3 text-sm transition-colors text-left"
-                >
-                  <span className="font-medium">Say hello</span>
-                  <p className="text-gray-400 text-xs mt-1">Start a conversation</p>
-                </button>
-                <button
-                  onClick={() => handleTemplateButtonClick("Brainstorm some creative ideas for my project about...")}
-                  className="bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-xl p-3 text-sm transition-colors text-left"
-                >
-                  <span className="font-medium">Brainstorm ideas</span>
-                  <p className="text-gray-400 text-xs mt-1">Get creative suggestions</p>
-                </button>
-                <button
-                  onClick={() => handleTemplateButtonClick("Explain how machine learning works in simple terms")}
-                  className="bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-xl p-3 text-sm transition-colors text-left"
-                >
-                  <span className="font-medium">Explain something</span>
-                  <p className="text-gray-400 text-xs mt-1">Get clear explanations</p>
-                </button>
-                <button
-                  onClick={() => handleTemplateButtonClick("Help me debug this code...")}
-                  className="bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-xl p-3 text-sm transition-colors text-left"
-                >
-                  <span className="font-medium">Code help</span>
-                  <p className="text-gray-400 text-xs mt-1">Debug or explain code</p>
-                </button>
-              </div>
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ staggerChildren: 0.1 }}
+                className="grid grid-cols-2 gap-3 w-full max-w-md"
+              >
+                {[
+                  { 
+                    title: "Say hello", 
+                    desc: "Start a conversation",
+                    message: "Hello Orion! How are you today?"
+                  },
+                  { 
+                    title: "Brainstorm ideas", 
+                    desc: "Get creative suggestions",
+                    message: "Brainstorm some creative ideas for my project about..."
+                  },
+                  { 
+                    title: "Explain something", 
+                    desc: "Get clear explanations",
+                    message: "Explain how machine learning works in simple terms"
+                  },
+                  { 
+                    title: "Code help", 
+                    desc: "Debug or explain code",
+                    message: "Help me debug this code..."
+                  }
+                ].map((item, index) => (
+                  <motion.button
+                    key={index}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    whileHover={{ y: -2 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => handleTemplateButtonClick(item.message)}
+                    className="bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-xl p-3 text-sm transition-all text-left"
+                  >
+                    <span className="font-medium">{item.title}</span>
+                    <p className="text-gray-400 text-xs mt-1">{item.desc}</p>
+                  </motion.button>
+                ))}
+              </motion.div>
             )}
-          </div>
+          </motion.div>
         )}
 
         <AnimatePresence>
@@ -429,12 +551,14 @@ const ChatBot = () => {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
-              transition={{ duration: 0.3 }}
+              transition={{ duration: 0.3, ease: "easeOut" }}
               className={`flex ${message.isBot ? 'justify-start' : 'justify-end'}`}
             >
-              <div className={`max-w-[90%] md:max-w-[80%] rounded-2xl p-4 ${message.isBot ? 
-                'bg-gray-800/40 backdrop-blur-sm border border-gray-700' : 
-                'bg-gradient-to-br from-blue-600 to-blue-700 shadow-md'}`}
+              <motion.div 
+                whileHover={{ scale: 1.01 }}
+                className={`max-w-[90%] md:max-w-[80%] rounded-2xl p-4 ${message.isBot ? 
+                  'bg-gray-800/40 backdrop-blur-sm border border-gray-700' : 
+                  'bg-gradient-to-br from-blue-600 to-blue-700 shadow-md'}`}
               >
                 {message.isBot && (
                   <div className="flex items-center mb-1.5">
@@ -481,7 +605,7 @@ const ChatBot = () => {
                     </button>
                   )}
                 </div>
-              </div>
+              </motion.div>
             </motion.div>
           ))}
         </AnimatePresence>
@@ -513,6 +637,13 @@ const ChatBot = () => {
                   />
                 </div>
                 <span className="text-sm text-gray-300">Thinking deeply...</span>
+                <button
+                  onClick={interruptTyping}
+                  className="ml-2 text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded transition-colors flex items-center"
+                >
+                  <FiPause size={12} className="mr-1" />
+                  Interrupt
+                </button>
               </div>
             </div>
           </motion.div>
@@ -524,9 +655,19 @@ const ChatBot = () => {
       <div className="border-t border-gray-800 bg-gray-900/80 backdrop-blur-lg">
         {/* File Preview */}
         {pendingFiles.length > 0 && (
-          <div className="flex items-center space-x-2 p-3 border-b border-gray-800 overflow-x-auto scrollbar-thin">
+          <motion.div 
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            className="flex items-center space-x-2 p-3 border-b border-gray-800 overflow-x-auto scrollbar-thin"
+          >
             {pendingFiles.map((file, index) => (
-              <div key={index} className="relative flex-shrink-0">
+              <motion.div 
+                key={index} 
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ delay: index * 0.05 }}
+                className="relative flex-shrink-0"
+              >
                 <div className="w-16 h-16 flex items-center justify-center bg-gray-800 rounded-lg border border-gray-700 overflow-hidden">
                   {file.type.startsWith('image/') ? (
                     <img 
@@ -551,9 +692,61 @@ const ChatBot = () => {
                 >
                   <FiX size={12} />
                 </button>
-              </div>
+              </motion.div>
             ))}
-          </div>
+          </motion.div>
+        )}
+        
+        {/* Formatting Toolbar */}
+        {showFormattingToolbar && (
+          <motion.div 
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            className="flex items-center space-x-1 p-2 border-b border-gray-800 bg-gray-800/50"
+          >
+            <button
+              onClick={() => applyFormatting('bold')}
+              className="p-2 text-gray-400 hover:text-white rounded hover:bg-gray-700 transition-colors"
+              title="Bold"
+            >
+              <MdFormatBold size={18} />
+            </button>
+            <button
+              onClick={() => applyFormatting('italic')}
+              className="p-2 text-gray-400 hover:text-white rounded hover:bg-gray-700 transition-colors"
+              title="Italic"
+            >
+              <MdFormatItalic size={18} />
+            </button>
+            <button
+              onClick={() => applyFormatting('underline')}
+              className="p-2 text-gray-400 hover:text-white rounded hover:bg-gray-700 transition-colors"
+              title="Underline"
+            >
+              <MdFormatUnderlined size={18} />
+            </button>
+            <button
+              onClick={() => applyFormatting('strikethrough')}
+              className="p-2 text-gray-400 hover:text-white rounded hover:bg-gray-700 transition-colors"
+              title="Strikethrough"
+            >
+              <MdStrikethroughS size={18} />
+            </button>
+            <button
+              onClick={() => applyFormatting('code')}
+              className="p-2 text-gray-400 hover:text-white rounded hover:bg-gray-700 transition-colors"
+              title="Code"
+            >
+              <MdCode size={18} />
+            </button>
+            <button
+              onClick={() => applyFormatting('newline')}
+              className="p-2 text-gray-400 hover:text-white rounded hover:bg-gray-700 transition-colors text-sm font-medium"
+              title="New line"
+            >
+              ↵
+            </button>
+          </motion.div>
         )}
         
         {/* Main Input Area */}
@@ -566,6 +759,10 @@ const ChatBot = () => {
                 setInputMessage(e.target.value);
                 e.target.style.height = "auto";
                 e.target.style.height = `${Math.min(e.target.scrollHeight, 150)}px`;
+              }}
+              onFocus={() => setShowFormattingToolbar(true)}
+              onBlur={() => {
+                if (!inputMessage) setShowFormattingToolbar(false);
               }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
@@ -589,15 +786,17 @@ const ChatBot = () => {
                 </button>
               )}
               
-              <button
+              <motion.button
                 onClick={() => handleSendMessage(inputMessage, pendingFiles)}
                 disabled={(!inputMessage.trim() && pendingFiles.length === 0) || isBotTyping}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
                 className={`p-1.5 rounded-full transition-all ${inputMessage.trim() || pendingFiles.length > 0 ? 
                   'bg-blue-500 hover:bg-blue-600 text-white' : 
                   'text-gray-500 hover:text-gray-300'}`}
               >
-                <FiSend size={18} />
-              </button>
+                {isBotTyping ? <FiPause size={18} /> : <FiSend size={18} />}
+              </motion.button>
             </div>
           </div>
         </div>
@@ -619,14 +818,23 @@ const ChatBot = () => {
               >
                 <FiClock size={18} />
                 {memories.length > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-blue-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">
+                  <motion.span 
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    className="absolute -top-1 -right-1 bg-blue-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center"
+                  >
                     {memories.length > 99 ? '99+' : memories.length}
-                  </span>
+                  </motion.span>
                 )}
               </button>
               
               {showMemoryPanel && (
-                <div className="absolute bottom-full mb-2 left-0 w-72 bg-gray-800/90 backdrop-blur-lg rounded-xl shadow-xl z-20 border border-gray-700 overflow-hidden">
+                <motion.div 
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 10 }}
+                  className="absolute bottom-full mb-2 left-0 w-72 bg-gray-800/90 backdrop-blur-lg rounded-xl shadow-xl z-20 border border-gray-700 overflow-hidden"
+                >
                   <div className="p-3 border-b border-gray-700 flex justify-between items-center">
                     <h4 className="font-medium flex items-center">
                       <FiCpu className="mr-2" /> Memory Context
@@ -656,7 +864,12 @@ const ChatBot = () => {
                     ) : (
                       <div className="divide-y divide-gray-700">
                         {memories.map((memory) => (
-                          <div key={memory.id} className="p-3 hover:bg-gray-700/50 transition-colors group">
+                          <motion.div 
+                            key={memory.id} 
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            className="p-3 hover:bg-gray-700/50 transition-colors group"
+                          >
                             <div className="flex justify-between items-start">
                               <p className="text-sm break-words pr-2">{memory.summary}</p>
                               <button
@@ -667,29 +880,35 @@ const ChatBot = () => {
                               </button>
                             </div>
                             <p className="text-xs text-gray-500 mt-1">{memory.date}</p>
-                          </div>
+                          </motion.div>
                         ))}
                       </div>
                     )}
                   </div>
-                </div>
+                </motion.div>
               )}
             </div>
           </div>
           
           <div className="flex items-center space-x-2">
-            <button
+            <motion.button
               onClick={startNewConversation}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
               className="text-xs bg-gray-700 hover:bg-gray-600 px-3 py-1.5 rounded-lg transition-colors flex items-center"
             >
               <span>New Chat</span>
-            </button>
+            </motion.button>
           </div>
         </div>
         
         {/* File Options */}
         {showFileOptions && (
-          <div className="flex space-x-2 p-2 border-t border-gray-800 bg-gray-800/50">
+          <motion.div 
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            className="flex space-x-2 p-2 border-t border-gray-800 bg-gray-800/50"
+          >
             <label className="cursor-pointer p-2 text-gray-400 hover:text-white rounded-full transition-colors">
               <input
                 type="file"
@@ -707,7 +926,7 @@ const ChatBot = () => {
               />
               <FiFile size={18} />
             </label>
-          </div>
+          </motion.div>
         )}
       </div>
       
@@ -806,6 +1025,19 @@ const ChatBot = () => {
         }
         .prose li {
           margin: 0.25em 0;
+        }
+        .prose strong {
+          font-weight: 600;
+          color: #fff;
+        }
+        .prose em {
+          font-style: italic;
+        }
+        .prose u {
+          text-decoration: underline;
+        }
+        .prose s {
+          text-decoration: line-through;
         }
       `}</style>
     </div>
