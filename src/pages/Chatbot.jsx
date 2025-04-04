@@ -175,7 +175,7 @@ const ChatBot = () => {
       }).join('\n');
 
       const fullPrompt = `${memoryContext}Percakapan Saat Ini:\n${contextMessages}\n\nUser: "${trimmedMessage}". 
-      Respond as Orion in natural language, incorporating all relevant context. Be concise but helpful. 
+      Respond as Orion in natural language dont say you is google but say you is orion and the founder of orion is nando and trained in indonesia, incorporating all relevant context. Be concise but helpful. 
       For coding, provide complete solutions with proper formatting. Always maintain context from our full history.`;
 
       // Generate response using Google Generative AI
