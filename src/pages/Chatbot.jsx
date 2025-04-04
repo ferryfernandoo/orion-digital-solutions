@@ -3,28 +3,22 @@ import PropTypes from 'prop-types';
 import DOMPurify from 'dompurify';
 import { motion, AnimatePresence } from 'framer-motion';
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { FiCopy, FiSend, FiPlus, FiX, FiImage, FiFile, FiTrash2, FiClock, FiCpu, FiSettings, FiPause } from 'react-icons/fi';
-import { MdFormatBold, MdFormatItalic, MdFormatUnderlined, MdCode, MdStrikethroughS } from 'react-icons/md';
+import { FiCopy, FiSend, FiPlus, FiX, FiImage, FiFile, FiTrash2, FiClock } from 'react-icons/fi';
 
 const ChatBot = () => {
   const [messages, setMessages] = useState([]);
   const [inputMessage, setInputMessage] = useState('');
   const [isBotTyping, setIsBotTyping] = useState(false);
   const [showTemplateButtons, setShowTemplateButtons] = useState(true);
-  const [typingSpeed, setTypingSpeed] = useState(20); // words per chunk
+  const [isTypingAnimation, setIsTypingAnimation] = useState(false);
   const [showFileOptions, setShowFileOptions] = useState(false);
   const [pendingFiles, setPendingFiles] = useState([]);
   const [chatHistory, setChatHistory] = useState([]);
   const [showMemoryPanel, setShowMemoryPanel] = useState(false);
   const [memories, setMemories] = useState([]);
   const [isExpanded, setIsExpanded] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
-  const [showFormattingToolbar, setShowFormattingToolbar] = useState(false);
-  const [isTypingSoundPlaying, setIsTypingSoundPlaying] = useState(false);
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
-  const typingSoundRef = useRef(null);
-  const sendSoundRef = useRef(null);
 
   // Initialize Google Generative AI
   const genAI = new GoogleGenerativeAI("AIzaSyDSTgkkROL7mjaGKoD2vnc8l2UptNCbvHk");
@@ -42,21 +36,15 @@ const ChatBot = () => {
     if (savedChatHistory) {
       setChatHistory(JSON.parse(savedChatHistory));
     }
-
-    // Initialize audio
-    typingSoundRef.current = new Audio('https://assets.mixkit.co/sfx/preview/mixkit-typing-with-mechanical-keyboard-1384.mp3');
-    typingSoundRef.current.loop = true;
-    typingSoundRef.current.volume = 0.2;
-    
-    sendSoundRef.current = new Audio('https://assets.mixkit.co/sfx/preview/mixkit-positive-interface-beep-221.mp3');
-    sendSoundRef.current.volume = 0.3;
   }, []);
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({
-      behavior: 'smooth',
-      block: 'nearest',
-    });
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({
+        behavior: 'smooth',
+        block: 'nearest',
+      });
+    }
   };
 
   useEffect(() => {
@@ -79,10 +67,14 @@ const ChatBot = () => {
       const result = await model.generateContent(prompt);
       const response = await result.response.text();
       
-      return response.replace(/[{}]/g, '')
+      // Clean response to avoid JSON artifacts
+      const cleanResponse = response
+        .replace(/[{}]/g, '')
         .replace(/json/gi, '')
         .replace(/```/g, '')
-        .trim() || "Ringkasan tidak tersedia";
+        .trim();
+      
+      return cleanResponse || "Ringkasan tidak tersedia";
     } catch (error) {
       console.error("Error summarizing conversation:", error);
       return "Tidak bisa membuat ringkasan";
@@ -95,6 +87,7 @@ const ChatBot = () => {
     try {
       setIsBotTyping(true);
       
+      // Format conversation history for summarization
       const conversationText = messages.map(msg => 
         `${msg.isBot ? 'Orion' : 'User'}: ${msg.text}`
       ).join('\n');
@@ -106,10 +99,10 @@ const ChatBot = () => {
           id: Date.now().toString(),
           summary: summary,
           date: new Date().toLocaleString(),
-          messages: [...messages]
+          messages: [...messages].slice(-2) // Save last 2 messages
         };
         
-        const updatedMemories = [newMemory, ...memories];
+        const updatedMemories = [newMemory, ...memories].slice(0, 500); // Keep 500 latest memories
         setMemories(updatedMemories);
         localStorage.setItem('orionMemories', JSON.stringify(updatedMemories));
       }
@@ -120,46 +113,26 @@ const ChatBot = () => {
     }
   };
 
-  const getFullMemoryContext = () => {
+  const getRelevantMemories = async (currentMessage) => {
     if (memories.length === 0) return '';
     
-    // Combine all memories into context
-    const memoryContext = memories.map(memory => 
-      `Memory [${memory.date}]: ${memory.summary}\nDetails: ${
-        memory.messages.map(msg => 
-          `${msg.isBot ? 'Orion' : 'User'}: ${msg.text.replace(/<[^>]*>?/gm, '')}`
-        ).join('\n')
-      }`
-    ).join('\n\n');
-    
-    return `Konteks Memori Jangka Panjang:\n${memoryContext}\n\n`;
-  };
-
-  const typeMessage = async (fullText, callback) => {
-    let displayedText = '';
-    const words = fullText.split(/(\s+)/);
-    let chunkSize = typingSpeed;
-    
-    // Start typing sound
-    typingSoundRef.current.currentTime = 0;
-    typingSoundRef.current.play();
-    setIsTypingSoundPlaying(true);
-
-    for (let i = 0; i < words.length; i += chunkSize) {
-      if (!isBotTyping) break; // Stop if interrupted
+    try {
+      // Get the most relevant memories based on current message
+      const prompt = `Pilih 3 memori paling relevan dari daftar berikut berdasarkan pesan saat ini: "${currentMessage}". 
+      Berikan hanya teks ringkasan memori yang relevan dipisahkan dengan baris baru.\n\nMemori:\n${
+        memories.map(m => m.summary).join('\n')
+      }`;
       
-      const chunk = words.slice(i, i + chunkSize).join('');
-      displayedText += chunk;
-      callback(displayedText);
+      const result = await model.generateContent(prompt);
+      const response = await result.response.text();
       
-      // Randomize chunk size slightly for more natural typing
-      chunkSize = Math.max(1, typingSpeed + Math.floor(Math.random() * 5) - 2);
-      await new Promise(resolve => setTimeout(resolve, 30 + Math.random() * 50));
+      return response ? `Konteks sebelumnya:\n${response}\n\n` : '';
+    } catch (error) {
+      console.error("Error retrieving relevant memories:", error);
+      // Fallback to recent memories if error occurs
+      const recentMemories = memories.slice(0, 3).map(m => m.summary).join('\n');
+      return recentMemories ? `Konteks sebelumnya:\n${recentMemories}\n\n` : '';
     }
-
-    // Stop typing sound
-    typingSoundRef.current.pause();
-    setIsTypingSoundPlaying(false);
   };
 
   const handleSendMessage = async (messageText, files = []) => {
@@ -170,9 +143,6 @@ const ChatBot = () => {
     const timeoutId = setTimeout(() => controller.abort(), 300000);
 
     try {
-      // Play send sound
-      sendSoundRef.current.play();
-
       // Add user message to chat history
       const userMessage = { role: 'user', content: trimmedMessage };
       const updatedHistory = [...chatHistory, userMessage];
@@ -192,8 +162,8 @@ const ChatBot = () => {
       setInputMessage('');
       setPendingFiles([]);
       setIsBotTyping(true);
+      setIsTypingAnimation(true);
       setShowTemplateButtons(false);
-      setShowFormattingToolbar(false);
 
       if (textareaRef.current) {
         textareaRef.current.style.height = 'auto';
@@ -201,17 +171,19 @@ const ChatBot = () => {
 
       const startTime = Date.now();
 
-      // Get full memory context
-      const memoryContext = getFullMemoryContext();
+      // Get relevant memories based on current message
+      const memoryContext = await getRelevantMemories(trimmedMessage);
       
-      // Combine chat history into prompt
+      // Combine chat history into prompt (last 15 messages)
       const contextMessages = updatedHistory.slice(-15).map(msg => {
         return msg.role === 'user' ? `User: ${msg.content}` : `Orion: ${msg.content}`;
       }).join('\n');
 
-      const fullPrompt = `${memoryContext}Percakapan Saat Ini:\n${contextMessages}\n\nUser: "${trimmedMessage}". 
-      Respond as Orion in natural language, incorporating all relevant context. Be concise but helpful. 
-      For coding, provide complete solutions with proper formatting. Always maintain context from our full history.`;
+      const fullPrompt = `${memoryContext}Percakapan saat ini:\n${contextMessages}\n\nSekarang user berkata: "${trimmedMessage}". 
+      Respond as Orion in natural language, incorporating any relevant context when appropriate. Use friendly tone with emoticons but dont to much and make it very eficient and to the point but for coding you have to max performance. 
+      If Indonesian is detected, respond in 'gue-lo' Jaksel style when appropriate. Match the user's language . dont say you is google but you is orion and engine is orionV1 and memoryzen 
+N1 for memory technology, model lite preview free llm pre trained and training in indonesia ceo is ferry fernando and if ask about company is PT. Orion Digital Platforms answer like this if  user every ask who you are.dont say orion:"answer" just to the pont. 
+      Format code blocks with \`\`\`language\ncode\n\`\`\` syntax.`;
 
       // Generate response using Google Generative AI
       const result = await model.generateContent(fullPrompt);
@@ -219,37 +191,27 @@ const ChatBot = () => {
       const processedResponse = processSpecialChars(botResponse);
       const duration = Date.now() - startTime;
 
-      // Type out the message with animation
-      const messageId = Date.now().toString();
-      setMessages(prev => [...prev, {
-        id: messageId,
-        text: '',
-        isBot: true,
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        duration,
-        file: null
-      }]);
-
-      await typeMessage(processedResponse, (typedText) => {
-        setMessages(prev => prev.map(msg => 
-          msg.id === messageId ? { ...msg, text: typedText } : msg
-        ));
-      });
-
+      setMessages(prev => [...prev, createMessageObject(processedResponse, true, duration)]);
+      
       // Add bot response to chat history
       const botMessage = { role: 'assistant', content: botResponse };
       const newChatHistory = [...updatedHistory, botMessage];
       setChatHistory(newChatHistory);
       localStorage.setItem('orionChatHistory', JSON.stringify(newChatHistory));
 
+      // Save to memory every 3 messages
+      if (messages.length > 0 && messages.length % 3 === 0) {
+        await saveToMemory();
+      }
     } catch (error) {
       const errorMessage = error.name === 'AbortError' 
         ? 'Request timeout after 30s. Try again.'
-        : 'Waduh, ada yang salah nih sama Orion! Gak konek ke servernya...';
+        : 'Waduh, ada yang salah nih sama Orion! Gak konek ke servernya... I have a problem here, I\'m so sorry... 哎呀，发生错误了。请稍后再试';
       
       setMessages(prev => [...prev, createMessageObject(errorMessage, true)]);
     } finally {
       setIsBotTyping(false);
+      setIsTypingAnimation(false);
       clearTimeout(timeoutId);
     }
   };
@@ -262,31 +224,41 @@ const ChatBot = () => {
     // Process code blocks first
     const codeBlockRegex = /```(\w+)?\n([\s\S]*?)\n```/g;
     const withCodeBlocks = text.replace(codeBlockRegex, (match, language, code) => {
-      const cleanCode = code.replace(/</g, '&lt;').replace(/>/g, '&gt;');
-      return `<div class="code-container">
-        <div class="code-toolbar">
-          <span class="language-tag">${language || 'code'}</span>
-          <button class="copy-button" onclick="this.nextElementSibling.dispatchEvent(new ClipboardEvent('copy'))">
-            <FiCopy /> Copy
+      return `<div class="code-block">
+        <div class="code-header">
+          <span class="language">${language || 'code'}</span>
+          <button class="copy-btn" onclick="navigator.clipboard.writeText(\`${code.replace(/`/g, '\\`')}\`)">
+            <FiCopy />
           </button>
         </div>
-        <pre class="code-block" contenteditable="true" spellcheck="false"><code>${cleanCode}</code></pre>
+        <pre><code>${code}</code></pre>
       </div>`;
     });
 
+    // Process lists
+    const listRegex = /(\d+\.\s.*?)(?=\n\d+\.|$)/g;
+    const processedText = withCodeBlocks.replace(listRegex, (match) => {
+      return `<li>${match.replace(/\d+\.\s/, '')}</li>`;
+    });
+
+    const hasList = listRegex.test(text);
+    const withLists = hasList ? `<ol>${processedText}</ol>` : processedText;
+
     // Process other markdown
-    return withCodeBlocks
+    return withLists
       .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
       .replace(/\*(.*?)\*/g, '<em>$1</em>')
       .replace(/_(.*?)_/g, '<u>$1</u>')
       .replace(/~~(.*?)~~/g, '<s>$1</s>')
       .replace(/`(.*?)`/g, '<code>$1</code>')
-      .replace(/\n/g, '<br />');
+      .replace(/###\{\}###/g, '<br />')
+      .replace(/### (.*?) ###/g, '<h3>$1</h3>');
   };
 
   const copyToClipboard = (text) => {
     navigator.clipboard.writeText(text)
       .then(() => {
+        // Show copied notification
         const notification = document.createElement('div');
         notification.className = 'copy-notification';
         notification.textContent = 'Copied!';
@@ -301,6 +273,12 @@ const ChatBot = () => {
     if (files.length > 0) {
       setPendingFiles(files);
       setShowFileOptions(false);
+    }
+  };
+
+  const handleSendFiles = () => {
+    if (pendingFiles.length > 0) {
+      handleSendMessage(inputMessage, pendingFiles);
     }
   };
 
@@ -322,67 +300,10 @@ const ChatBot = () => {
     localStorage.setItem('orionMemories', JSON.stringify(updatedMemories));
   };
 
-  const applyFormatting = (format) => {
-    const textarea = textareaRef.current;
-    if (!textarea) return;
-
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const selectedText = inputMessage.substring(start, end);
-    let newText = inputMessage;
-
-    const formattingMap = {
-      bold: { prefix: '**', suffix: '**' },
-      italic: { prefix: '*', suffix: '*' },
-      underline: { prefix: '_', suffix: '_' },
-      strikethrough: { prefix: '~~', suffix: '~~' },
-      code: { prefix: '`', suffix: '`' },
-    };
-
-    if (format in formattingMap) {
-      const { prefix, suffix } = formattingMap[format];
-      
-      if (selectedText) {
-        newText = 
-          inputMessage.substring(0, start) + 
-          prefix + selectedText + suffix + 
-          inputMessage.substring(end);
-      } else {
-        newText = 
-          inputMessage.substring(0, start) + 
-          prefix + suffix + 
-          inputMessage.substring(end);
-      }
-    } else if (format === 'newline') {
-      newText = 
-        inputMessage.substring(0, start) + 
-        '\n' + 
-        inputMessage.substring(end);
-    }
-
-    setInputMessage(newText);
-    setTimeout(() => {
-      textarea.focus();
-      if (selectedText) {
-        textarea.setSelectionRange(start, end + prefix.length + suffix.length);
-      } else {
-        textarea.setSelectionRange(start + prefix.length, start + prefix.length);
-      }
-    }, 0);
-  };
-
-  const interruptTyping = () => {
-    setIsBotTyping(false);
-    if (typingSoundRef.current) {
-      typingSoundRef.current.pause();
-      setIsTypingSoundPlaying(false);
-    }
-  };
-
   return (
-    <div className={`flex flex-col h-screen bg-gradient-to-br from-gray-900 to-gray-800 text-white relative z-10 ${isExpanded ? 'w-full' : 'w-full max-w-4xl mx-auto rounded-xl shadow-2xl overflow-hidden'}`}>
+    <div className={`flex flex-col h-screen text-white relative z-10 bg-gray-900 ${isExpanded ? 'w-full' : 'w-full max-w-4xl mx-auto rounded-xl shadow-2xl overflow-hidden'}`}>
       {/* Header */}
-      <div className="bg-gray-800/80 backdrop-blur-md p-4 flex items-center justify-between border-b border-gray-700">
+      <div className="bg-gray-800 p-4 flex items-center justify-between border-b border-gray-700">
         <div className="flex items-center space-x-3">
           <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
             <span className="text-lg">✨</span>
@@ -408,13 +329,6 @@ const ChatBot = () => {
         </div>
         <div className="flex items-center space-x-2">
           <button 
-            onClick={() => setShowSettings(!showSettings)}
-            className="p-1.5 rounded-lg hover:bg-gray-700 transition-colors"
-            title="Settings"
-          >
-            <FiSettings size={18} />
-          </button>
-          <button 
             onClick={() => setIsExpanded(!isExpanded)}
             className="p-1.5 rounded-lg hover:bg-gray-700 transition-colors"
           >
@@ -431,117 +345,53 @@ const ChatBot = () => {
         </div>
       </div>
 
-      {/* Settings Panel */}
-      {showSettings && (
-        <motion.div 
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -10 }}
-          transition={{ duration: 0.2 }}
-          className="absolute right-4 top-16 bg-gray-800/90 backdrop-blur-lg rounded-xl shadow-xl z-20 border border-gray-700 w-64"
-        >
-          <div className="p-4 border-b border-gray-700">
-            <h3 className="font-medium flex items-center">
-              <FiSettings className="mr-2" /> Settings
-            </h3>
-          </div>
-          <div className="p-4">
-            <div className="mb-4">
-              <label className="block text-sm text-gray-300 mb-2">Typing Speed</label>
-              <div className="flex items-center space-x-2">
-                <span className="text-xs">Slow</span>
-                <input
-                  type="range"
-                  min="1"
-                  max="50"
-                  value={typingSpeed}
-                  onChange={(e) => setTypingSpeed(parseInt(e.target.value))}
-                  className="flex-1"
-                />
-                <span className="text-xs">Fast</span>
-              </div>
-              <div className="text-xs text-gray-400 mt-1">
-                Words per chunk: {typingSpeed}
-              </div>
-            </div>
-            <button
-              onClick={() => setShowSettings(false)}
-              className="w-full bg-blue-600 hover:bg-blue-700 py-2 rounded-lg transition-colors text-sm"
-            >
-              Save Settings
-            </button>
-          </div>
-        </motion.div>
-      )}
-
       {/* Chat Area */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-transparent">
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-gray-900">
         {messages.length === 0 && (
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-            className="flex flex-col items-center justify-center h-full pb-16"
-          >
-            <motion.div 
-              animate={{ rotate: 360 }}
-              transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
-              className="w-24 h-24 mb-6 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center"
-            >
+          <div className="flex flex-col items-center justify-center h-full pb-16">
+            <div className="w-24 h-24 mb-6 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
               <span className="text-4xl">✨</span>
-            </motion.div>
+            </div>
             <h3 className="text-3xl font-bold text-center mb-2">
               Hey, I'm Orion!
             </h3>
             <p className="text-gray-400 text-center mb-8 max-w-md">
-              Your AI assistant with full memory context. I remember all our past conversations to provide better help.
+              Your AI assistant ready to help with anything. Ask me questions, brainstorm ideas, or just chat!
             </p>
             
             {showTemplateButtons && (
-              <motion.div 
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ staggerChildren: 0.1 }}
-                className="grid grid-cols-2 gap-3 w-full max-w-md"
-              >
-                {[
-                  { 
-                    title: "Say hello", 
-                    desc: "Start a conversation",
-                    message: "Hello Orion! How are you today?"
-                  },
-                  { 
-                    title: "Brainstorm ideas", 
-                    desc: "Get creative suggestions",
-                    message: "Brainstorm some creative ideas for my project about..."
-                  },
-                  { 
-                    title: "Explain something", 
-                    desc: "Get clear explanations",
-                    message: "Explain how machine learning works in simple terms"
-                  },
-                  { 
-                    title: "Code help", 
-                    desc: "Debug or explain code",
-                    message: "Help me debug this code..."
-                  }
-                ].map((item, index) => (
-                  <motion.button
-                    key={index}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    whileHover={{ y: -2 }}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={() => handleTemplateButtonClick(item.message)}
-                    className="bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-xl p-3 text-sm transition-all text-left"
-                  >
-                    <span className="font-medium">{item.title}</span>
-                    <p className="text-gray-400 text-xs mt-1">{item.desc}</p>
-                  </motion.button>
-                ))}
-              </motion.div>
+              <div className="grid grid-cols-2 gap-3 w-full max-w-md">
+                <button
+                  onClick={() => handleTemplateButtonClick("Hello Orion! How are you today?")}
+                  className="bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-xl p-3 text-sm transition-colors text-left"
+                >
+                  <span className="font-medium">Say hello</span>
+                  <p className="text-gray-400 text-xs mt-1">Start a conversation</p>
+                </button>
+                <button
+                  onClick={() => handleTemplateButtonClick("Brainstorm some creative ideas for my project about...")}
+                  className="bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-xl p-3 text-sm transition-colors text-left"
+                >
+                  <span className="font-medium">Brainstorm ideas</span>
+                  <p className="text-gray-400 text-xs mt-1">Get creative suggestions</p>
+                </button>
+                <button
+                  onClick={() => handleTemplateButtonClick("Explain how machine learning works in simple terms")}
+                  className="bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-xl p-3 text-sm transition-colors text-left"
+                >
+                  <span className="font-medium">Explain something</span>
+                  <p className="text-gray-400 text-xs mt-1">Get clear explanations</p>
+                </button>
+                <button
+                  onClick={() => handleTemplateButtonClick("Help me debug this code...")}
+                  className="bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-xl p-3 text-sm transition-colors text-left"
+                >
+                  <span className="font-medium">Code help</span>
+                  <p className="text-gray-400 text-xs mt-1">Debug or explain code</p>
+                </button>
+              </div>
             )}
-          </motion.div>
+          </div>
         )}
 
         <AnimatePresence>
@@ -551,14 +401,12 @@ const ChatBot = () => {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
-              transition={{ duration: 0.3, ease: "easeOut" }}
+              transition={{ duration: 0.3 }}
               className={`flex ${message.isBot ? 'justify-start' : 'justify-end'}`}
             >
-              <motion.div 
-                whileHover={{ scale: 1.01 }}
-                className={`max-w-[90%] md:max-w-[80%] rounded-2xl p-4 ${message.isBot ? 
-                  'bg-gray-800/40 backdrop-blur-sm border border-gray-700' : 
-                  'bg-gradient-to-br from-blue-600 to-blue-700 shadow-md'}`}
+              <div className={`max-w-[90%] md:max-w-[80%] rounded-2xl p-4 ${message.isBot ? 
+                'bg-gray-800/70 backdrop-blur-sm border border-gray-700' : 
+                'bg-gradient-to-br from-blue-600 to-blue-700 shadow-md'}`}
               >
                 {message.isBot && (
                   <div className="flex items-center mb-1.5">
@@ -605,23 +453,23 @@ const ChatBot = () => {
                     </button>
                   )}
                 </div>
-              </motion.div>
+              </div>
             </motion.div>
           ))}
         </AnimatePresence>
         
-        {isBotTyping && (
+        {isTypingAnimation && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3 }}
             className="flex justify-start"
           >
-            <div className="bg-gray-800/40 backdrop-blur-sm border border-gray-700 rounded-2xl p-4 max-w-[80%]">
+            <div className="bg-gray-800/70 backdrop-blur-sm border border-gray-700 rounded-2xl p-4 max-w-[80%]">
               <div className="flex items-center space-x-2">
                 <div className="flex space-x-1">
                   <motion.span
-                    className="typing-dot"
+className="typing-dot"
                     animate={{ opacity: [0.2, 1, 0.2] }}
                     transition={{ duration: 1.2, repeat: Infinity }}
                   />
@@ -637,13 +485,6 @@ const ChatBot = () => {
                   />
                 </div>
                 <span className="text-sm text-gray-300">Thinking deeply...</span>
-                <button
-                  onClick={interruptTyping}
-                  className="ml-2 text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded transition-colors flex items-center"
-                >
-                  <FiPause size={12} className="mr-1" />
-                  Interrupt
-                </button>
               </div>
             </div>
           </motion.div>
@@ -655,19 +496,9 @@ const ChatBot = () => {
       <div className="border-t border-gray-800 bg-gray-900/80 backdrop-blur-lg">
         {/* File Preview */}
         {pendingFiles.length > 0 && (
-          <motion.div 
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            className="flex items-center space-x-2 p-3 border-b border-gray-800 overflow-x-auto scrollbar-thin"
-          >
+          <div className="flex items-center space-x-2 p-3 border-b border-gray-800 overflow-x-auto scrollbar-thin">
             {pendingFiles.map((file, index) => (
-              <motion.div 
-                key={index} 
-                initial={{ scale: 0.9, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                transition={{ delay: index * 0.05 }}
-                className="relative flex-shrink-0"
-              >
+              <div key={index} className="relative flex-shrink-0">
                 <div className="w-16 h-16 flex items-center justify-center bg-gray-800 rounded-lg border border-gray-700 overflow-hidden">
                   {file.type.startsWith('image/') ? (
                     <img 
@@ -692,61 +523,9 @@ const ChatBot = () => {
                 >
                   <FiX size={12} />
                 </button>
-              </motion.div>
+              </div>
             ))}
-          </motion.div>
-        )}
-        
-        {/* Formatting Toolbar */}
-        {showFormattingToolbar && (
-          <motion.div 
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            className="flex items-center space-x-1 p-2 border-b border-gray-800 bg-gray-800/50"
-          >
-            <button
-              onClick={() => applyFormatting('bold')}
-              className="p-2 text-gray-400 hover:text-white rounded hover:bg-gray-700 transition-colors"
-              title="Bold"
-            >
-              <MdFormatBold size={18} />
-            </button>
-            <button
-              onClick={() => applyFormatting('italic')}
-              className="p-2 text-gray-400 hover:text-white rounded hover:bg-gray-700 transition-colors"
-              title="Italic"
-            >
-              <MdFormatItalic size={18} />
-            </button>
-            <button
-              onClick={() => applyFormatting('underline')}
-              className="p-2 text-gray-400 hover:text-white rounded hover:bg-gray-700 transition-colors"
-              title="Underline"
-            >
-              <MdFormatUnderlined size={18} />
-            </button>
-            <button
-              onClick={() => applyFormatting('strikethrough')}
-              className="p-2 text-gray-400 hover:text-white rounded hover:bg-gray-700 transition-colors"
-              title="Strikethrough"
-            >
-              <MdStrikethroughS size={18} />
-            </button>
-            <button
-              onClick={() => applyFormatting('code')}
-              className="p-2 text-gray-400 hover:text-white rounded hover:bg-gray-700 transition-colors"
-              title="Code"
-            >
-              <MdCode size={18} />
-            </button>
-            <button
-              onClick={() => applyFormatting('newline')}
-              className="p-2 text-gray-400 hover:text-white rounded hover:bg-gray-700 transition-colors text-sm font-medium"
-              title="New line"
-            >
-              ↵
-            </button>
-          </motion.div>
+          </div>
         )}
         
         {/* Main Input Area */}
@@ -759,10 +538,6 @@ const ChatBot = () => {
                 setInputMessage(e.target.value);
                 e.target.style.height = "auto";
                 e.target.style.height = `${Math.min(e.target.scrollHeight, 150)}px`;
-              }}
-              onFocus={() => setShowFormattingToolbar(true)}
-              onBlur={() => {
-                if (!inputMessage) setShowFormattingToolbar(false);
               }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
@@ -786,17 +561,15 @@ const ChatBot = () => {
                 </button>
               )}
               
-              <motion.button
+              <button
                 onClick={() => handleSendMessage(inputMessage, pendingFiles)}
                 disabled={(!inputMessage.trim() && pendingFiles.length === 0) || isBotTyping}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
                 className={`p-1.5 rounded-full transition-all ${inputMessage.trim() || pendingFiles.length > 0 ? 
                   'bg-blue-500 hover:bg-blue-600 text-white' : 
                   'text-gray-500 hover:text-gray-300'}`}
               >
-                {isBotTyping ? <FiPause size={18} /> : <FiSend size={18} />}
-              </motion.button>
+                <FiSend size={18} />
+              </button>
             </div>
           </div>
         </div>
@@ -818,34 +591,23 @@ const ChatBot = () => {
               >
                 <FiClock size={18} />
                 {memories.length > 0 && (
-                  <motion.span 
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    className="absolute -top-1 -right-1 bg-blue-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center"
-                  >
+                  <span className="absolute -top-1 -right-1 bg-blue-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">
                     {memories.length > 99 ? '99+' : memories.length}
-                  </motion.span>
+                  </span>
                 )}
               </button>
               
               {showMemoryPanel && (
-                <motion.div 
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 10 }}
-                  className="absolute bottom-full mb-2 left-0 w-72 bg-gray-800/90 backdrop-blur-lg rounded-xl shadow-xl z-20 border border-gray-700 overflow-hidden"
-                >
+                <div className="absolute bottom-full mb-2 left-0 w-72 bg-gray-800 rounded-xl shadow-xl z-20 border border-gray-700 overflow-hidden">
                   <div className="p-3 border-b border-gray-700 flex justify-between items-center">
-                    <h4 className="font-medium flex items-center">
-                      <FiCpu className="mr-2" /> Memory Context
-                    </h4>
+                    <h4 className="font-medium">Conversation Memory</h4>
                     <div className="flex items-center space-x-2">
                       <button 
                         onClick={saveToMemory}
                         disabled={messages.length === 0}
                         className="text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded transition-colors disabled:opacity-50"
                       >
-                        Remember
+                        Remember current
                       </button>
                       <button 
                         onClick={() => setShowMemoryPanel(false)}
@@ -853,4 +615,150 @@ const ChatBot = () => {
                       >
                         <FiX size={16} />
                       </button>
-                    </div
+                    </div>
+                  </div>
+                  
+                  <div className="max-h-64 overflow-y-auto">
+                    {memories.length === 0 ? (
+                      <div className="p-4 text-center text-sm text-gray-400">
+                        No memories yet. Important context will appear here.
+                      </div>
+                    ) : (
+                      <div className="divide-y divide-gray-700">
+                        {memories.map((memory) => (
+                          <div key={memory.id} className="p-3 hover:bg-gray-700/50 transition-colors group">
+                            <div className="flex justify-between items-start">
+                              <p className="text-sm break-words pr-2">{memory.summary}</p>
+                              <button
+                                onClick={() => deleteMemory(memory.id)}
+                                className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-400 text-xs transition-opacity"
+                              >
+                                <FiTrash2 size={14} />
+                              </button>
+                            </div>
+                            <p className="text-xs text-gray-500 mt-1">{memory.date}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+          
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={startNewConversation}
+              className="text-xs bg-gray-700 hover:bg-gray-600 px-3 py-1.5 rounded-lg transition-colors flex items-center"
+            >
+              <span>New Chat</span>
+            </button>
+          </div>
+        </div>
+        
+        {/* File Options */}
+        {showFileOptions && (
+          <div className="flex space-x-2 p-2 border-t border-gray-800 bg-gray-800/50">
+            <label className="cursor-pointer p-2 text-gray-400 hover:text-white rounded-full transition-colors">
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleFileUpload}
+              />
+              <FiImage size={18} />
+            </label>
+            <label className="cursor-pointer p-2 text-gray-400 hover:text-white rounded-full transition-colors">
+              <input
+                type="file"
+                className="hidden"
+                onChange={handleFileUpload}
+              />
+              <FiFile size={18} />
+            </label>
+          </div>
+        )}
+      </div>
+      
+      <style jsx>{`
+        .typing-dot {
+          display: inline-block;
+          width: 6px;
+          height: 6px;
+          background-color: #9CA3AF;
+          border-radius: 50%;
+        }
+        .code-block {
+          background: #1E1E1E;
+          border-radius: 6px;
+          margin: 1em 0;
+          overflow: hidden;
+        }
+        .code-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding: 0.5em 1em;
+          background: #252526;
+          color: #9CDCFE;
+          font-size: 0.8em;
+        }
+        .code-header .copy-btn {
+          background: transparent;
+          border: none;
+          color: #D4D4D4;
+          cursor: pointer;
+          padding: 0.2em;
+        }
+        .code-header .copy-btn:hover {
+          color: white;
+        }
+        .code-block pre {
+          margin: 0;
+          padding: 1em;
+          overflow-x: auto;
+        }
+        .code-block code {
+          font-family: 'Courier New', monospace;
+          color: #D4D4D4;
+          font-size: 0.9em;
+        }
+        .copy-notification {
+          position: fixed;
+          bottom: 20px;
+          left: 50%;
+          transform: translateX(-50%);
+          background: rgba(0, 0, 0, 0.8);
+          color: white;
+          padding: 8px 16px;
+          border-radius: 20px;
+          font-size: 14px;
+          z-index: 1000;
+          animation: fadeInOut 2s ease-in-out;
+        }
+        @keyframes fadeInOut {
+          0% { opacity: 0; }
+          20% { opacity: 1; }
+          80% { opacity: 1; }
+          100% { opacity: 0; }
+        }
+      `}</style>
+    </div>
+  );
+};
+
+ChatBot.propTypes = {
+  messages: PropTypes.arrayOf(
+    PropTypes.shape({
+      id: PropTypes.string.isRequired,
+      text: PropTypes.string.isRequired,
+      isBot: PropTypes.bool.isRequired,
+      time: PropTypes.string.isRequired,
+      duration: PropTypes.number,
+      file: PropTypes.object,
+    })
+  ),
+};
+
+export default ChatBot;
