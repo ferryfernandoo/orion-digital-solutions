@@ -355,9 +355,9 @@ const ChatBot = () => {
                 <input
                   type="range"
                   min="20"
-                  max="100"
+                  max="5000"
                   value={100 - typingSpeed}
-                  onChange={(e) => setTypingSpeed(100 - parseInt(e.target.value))}
+                  onChange={(e) => setTypingSpeed(5000 - parseInt(e.target.value))}
                   className="flex-1"
                 />
                 <span className="text-xs">Fast</span>
