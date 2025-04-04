@@ -20,11 +20,9 @@ const ChatBot = () => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showFormattingToolbar, setShowFormattingToolbar] = useState(false);
-  const [isTypingSoundPlaying, setIsTypingSoundPlaying] = useState(false);
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
-  const typingSoundRef = useRef(null);
-  const sendSoundRef = useRef(null);
+
 
   // Initialize Google Generative AI
   const genAI = new GoogleGenerativeAI("AIzaSyDSTgkkROL7mjaGKoD2vnc8l2UptNCbvHk");
@@ -43,14 +41,7 @@ const ChatBot = () => {
       setChatHistory(JSON.parse(savedChatHistory));
     }
 
-    // Initialize audio
-    typingSoundRef.current = new Audio('https://assets.mixkit.co/sfx/preview/mixkit-typing-with-mechanical-keyboard-1384.mp3');
-    typingSoundRef.current.loop = true;
-    typingSoundRef.current.volume = 0.2;
-    
-    sendSoundRef.current = new Audio('https://assets.mixkit.co/sfx/preview/mixkit-positive-interface-beep-221.mp3');
-    sendSoundRef.current.volume = 0.3;
-  }, []);
+   
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({
