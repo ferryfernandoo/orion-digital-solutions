@@ -3,21 +3,20 @@ import PropTypes from 'prop-types';
 import DOMPurify from 'dompurify';
 import { motion, AnimatePresence } from 'framer-motion';
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { FiCopy, FiSend, FiPlus, FiX, FiImage, FiFile, FiTrash2, FiClock, FiCpu, FiSettings } from 'react-icons/fi';
+import { FiCopy, FiSend, FiPlus, FiX, FiImage, FiFile, FiTrash2, FiClock } from 'react-icons/fi';
 
 const ChatBot = () => {
   const [messages, setMessages] = useState([]);
   const [inputMessage, setInputMessage] = useState('');
   const [isBotTyping, setIsBotTyping] = useState(false);
   const [showTemplateButtons, setShowTemplateButtons] = useState(true);
-  const [typingSpeed, setTypingSpeed] = useState(1); // ms per character
+  const [isTypingAnimation, setIsTypingAnimation] = useState(false);
   const [showFileOptions, setShowFileOptions] = useState(false);
   const [pendingFiles, setPendingFiles] = useState([]);
   const [chatHistory, setChatHistory] = useState([]);
   const [showMemoryPanel, setShowMemoryPanel] = useState(false);
   const [memories, setMemories] = useState([]);
   const [isExpanded, setIsExpanded] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
 
@@ -40,10 +39,12 @@ const ChatBot = () => {
   }, []);
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({
-      behavior: 'smooth',
-      block: 'nearest',
-    });
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({
+        behavior: 'smooth',
+        block: 'nearest',
+      });
+    }
   };
 
   useEffect(() => {
@@ -66,10 +67,14 @@ const ChatBot = () => {
       const result = await model.generateContent(prompt);
       const response = await result.response.text();
       
-      return response.replace(/[{}]/g, '')
+      // Clean response to avoid JSON artifacts
+      const cleanResponse = response
+        .replace(/[{}]/g, '')
         .replace(/json/gi, '')
         .replace(/```/g, '')
-        .trim() || "Ringkasan tidak tersedia";
+        .trim();
+      
+      return cleanResponse || "Ringkasan tidak tersedia";
     } catch (error) {
       console.error("Error summarizing conversation:", error);
       return "Tidak bisa membuat ringkasan";
@@ -82,6 +87,7 @@ const ChatBot = () => {
     try {
       setIsBotTyping(true);
       
+      // Format conversation history for summarization
       const conversationText = messages.map(msg => 
         `${msg.isBot ? 'Orion' : 'User'}: ${msg.text}`
       ).join('\n');
@@ -93,10 +99,10 @@ const ChatBot = () => {
           id: Date.now().toString(),
           summary: summary,
           date: new Date().toLocaleString(),
-          messages: [...messages]
+          messages: [...messages].slice(-5) // Save last 5 messages
         };
         
-        const updatedMemories = [newMemory, ...memories];
+        const updatedMemories = [newMemory, ...memories].slice(0, 20); // Keep 20 latest memories
         setMemories(updatedMemories);
         localStorage.setItem('orionMemories', JSON.stringify(updatedMemories));
       }
@@ -107,27 +113,25 @@ const ChatBot = () => {
     }
   };
 
-  const getFullMemoryContext = () => {
+  const getRelevantMemories = async (currentMessage) => {
     if (memories.length === 0) return '';
     
-    // Combine all memories into context
-    const memoryContext = memories.map(memory => 
-      `Memory [${memory.date}]: ${memory.summary}\nDetails: ${
-        memory.messages.map(msg => 
-          `${msg.isBot ? 'Orion' : 'User'}: ${msg.text.replace(/<[^>]*>?/gm, '')}`
-        ).join('\n')
-      }`
-    ).join('\n\n');
-    
-    return `Konteks Memori Jangka Panjang:\n${memoryContext}\n\n`;
-  };
-
-  const typeMessage = async (fullText, callback) => {
-    let displayedText = '';
-    for (let i = 0; i < fullText.length; i++) {
-      displayedText += fullText[i];
-      callback(displayedText);
-      await new Promise(resolve => setTimeout(resolve, typingSpeed));
+    try {
+      // Get the most relevant memories based on current message
+      const prompt = `Pilih 3 memori paling relevan dari daftar berikut berdasarkan pesan saat ini: "${currentMessage}". 
+      Berikan hanya teks ringkasan memori yang relevan dipisahkan dengan baris baru.\n\nMemori:\n${
+        memories.map(m => m.summary).join('\n')
+      }`;
+      
+      const result = await model.generateContent(prompt);
+      const response = await result.response.text();
+      
+      return response ? `Konteks sebelumnya:\n${response}\n\n` : '';
+    } catch (error) {
+      console.error("Error retrieving relevant memories:", error);
+      // Fallback to recent memories if error occurs
+      const recentMemories = memories.slice(0, 3).map(m => m.summary).join('\n');
+      return recentMemories ? `Konteks sebelumnya:\n${recentMemories}\n\n` : '';
     }
   };
 
@@ -158,6 +162,7 @@ const ChatBot = () => {
       setInputMessage('');
       setPendingFiles([]);
       setIsBotTyping(true);
+      setIsTypingAnimation(true);
       setShowTemplateButtons(false);
 
       if (textareaRef.current) {
@@ -166,17 +171,19 @@ const ChatBot = () => {
 
       const startTime = Date.now();
 
-      // Get full memory context
-      const memoryContext = getFullMemoryContext();
+      // Get relevant memories based on current message
+      const memoryContext = await getRelevantMemories(trimmedMessage);
       
-      // Combine chat history into prompt
+      // Combine chat history into prompt (last 15 messages)
       const contextMessages = updatedHistory.slice(-15).map(msg => {
         return msg.role === 'user' ? `User: ${msg.content}` : `Orion: ${msg.content}`;
       }).join('\n');
 
-      const fullPrompt = `${memoryContext}Percakapan Saat Ini:\n${contextMessages}\n\nUser: "${trimmedMessage}". 
-      Respond as Orion in natural language dont say you is google but say you is orion and the founder of orion is nando and trained in indonesia, incorporating all relevant context. Be concise but helpful. 
-      For coding, provide complete solutions with proper formatting. Always maintain context from our full history.`;
+      const fullPrompt = `${memoryContext}Percakapan saat ini:\n${contextMessages}\n\nSekarang user berkata: "${trimmedMessage}". 
+      Respond as Orion in natural language, incorporating any relevant context when appropriate. Use friendly tone with emoticons but dont to much and make it very eficient and to the point but for coding you have to max performance. 
+      If Indonesian is detected, respond in 'gue-lo' Jaksel style when appropriate. Match the user's language . dont say you is google but you is orion and engine is orionV1 and memoryzen 
+N1 for memory technology, model lite preview free llm pre trained and training in indonesia ceo is ferry fernando and if ask about company is PT. Orion Digital Platforms answer like this if  user every ask who you are.dont say orion:"answer" just to the pont. 
+      Format code blocks with \`\`\`language\ncode\n\`\`\` syntax.`;
 
       // Generate response using Google Generative AI
       const result = await model.generateContent(fullPrompt);
@@ -184,37 +191,27 @@ const ChatBot = () => {
       const processedResponse = processSpecialChars(botResponse);
       const duration = Date.now() - startTime;
 
-      // Type out the message with animation
-      const messageId = Date.now().toString();
-      setMessages(prev => [...prev, {
-        id: messageId,
-        text: '',
-        isBot: true,
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        duration,
-        file: null
-      }]);
-
-      await typeMessage(processedResponse, (typedText) => {
-        setMessages(prev => prev.map(msg => 
-          msg.id === messageId ? { ...msg, text: typedText } : msg
-        ));
-      });
-
+      setMessages(prev => [...prev, createMessageObject(processedResponse, true, duration)]);
+      
       // Add bot response to chat history
       const botMessage = { role: 'assistant', content: botResponse };
       const newChatHistory = [...updatedHistory, botMessage];
       setChatHistory(newChatHistory);
       localStorage.setItem('orionChatHistory', JSON.stringify(newChatHistory));
 
+      // Save to memory every 3 messages
+      if (messages.length > 0 && messages.length % 3 === 0) {
+        await saveToMemory();
+      }
     } catch (error) {
       const errorMessage = error.name === 'AbortError' 
         ? 'Request timeout after 30s. Try again.'
-        : 'Waduh, ada yang salah nih sama Orion! Gak konek ke servernya...';
+        : 'Waduh, ada yang salah nih sama Orion! Gak konek ke servernya... I have a problem here, I\'m so sorry... 哎呀，发生错误了。请稍后再试';
       
       setMessages(prev => [...prev, createMessageObject(errorMessage, true)]);
     } finally {
       setIsBotTyping(false);
+      setIsTypingAnimation(false);
       clearTimeout(timeoutId);
     }
   };
@@ -227,31 +224,41 @@ const ChatBot = () => {
     // Process code blocks first
     const codeBlockRegex = /```(\w+)?\n([\s\S]*?)\n```/g;
     const withCodeBlocks = text.replace(codeBlockRegex, (match, language, code) => {
-      const cleanCode = code.replace(/</g, '&lt;').replace(/>/g, '&gt;');
-      return `<div class="code-container">
-        <div class="code-toolbar">
-          <span class="language-tag">${language || 'code'}</span>
-          <button class="copy-button" onclick="this.nextElementSibling.dispatchEvent(new ClipboardEvent('copy'))">
-            <FiCopy /> Copy
+      return `<div class="code-block">
+        <div class="code-header">
+          <span class="language">${language || 'code'}</span>
+          <button class="copy-btn" onclick="navigator.clipboard.writeText(\`${code.replace(/`/g, '\\`')}\`)">
+            <FiCopy />
           </button>
         </div>
-        <pre class="code-block" contenteditable="true" spellcheck="false"><code>${cleanCode}</code></pre>
+        <pre><code>${code}</code></pre>
       </div>`;
     });
 
+    // Process lists
+    const listRegex = /(\d+\.\s.*?)(?=\n\d+\.|$)/g;
+    const processedText = withCodeBlocks.replace(listRegex, (match) => {
+      return `<li>${match.replace(/\d+\.\s/, '')}</li>`;
+    });
+
+    const hasList = listRegex.test(text);
+    const withLists = hasList ? `<ol>${processedText}</ol>` : processedText;
+
     // Process other markdown
-    return withCodeBlocks
+    return withLists
       .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
       .replace(/\*(.*?)\*/g, '<em>$1</em>')
       .replace(/_(.*?)_/g, '<u>$1</u>')
       .replace(/~~(.*?)~~/g, '<s>$1</s>')
       .replace(/`(.*?)`/g, '<code>$1</code>')
-      .replace(/\n/g, '<br />');
+      .replace(/###\{\}###/g, '<br />')
+      .replace(/### (.*?) ###/g, '<h3>$1</h3>');
   };
 
   const copyToClipboard = (text) => {
     navigator.clipboard.writeText(text)
       .then(() => {
+        // Show copied notification
         const notification = document.createElement('div');
         notification.className = 'copy-notification';
         notification.textContent = 'Copied!';
@@ -266,6 +273,12 @@ const ChatBot = () => {
     if (files.length > 0) {
       setPendingFiles(files);
       setShowFileOptions(false);
+    }
+  };
+
+  const handleSendFiles = () => {
+    if (pendingFiles.length > 0) {
+      handleSendMessage(inputMessage, pendingFiles);
     }
   };
 
@@ -288,9 +301,9 @@ const ChatBot = () => {
   };
 
   return (
-    <div className={`flex flex-col h-screen bg-gradient-to-br from-gray-900 to-gray-800 text-white relative z-10 ${isExpanded ? 'w-full' : 'w-full max-w-4xl mx-auto rounded-xl shadow-2xl overflow-hidden'}`}>
+    <div className={`flex flex-col h-screen text-white relative z-10 bg-gray-900 ${isExpanded ? 'w-full' : 'w-full max-w-4xl mx-auto rounded-xl shadow-2xl overflow-hidden'}`}>
       {/* Header */}
-      <div className="bg-gray-800/80 backdrop-blur-md p-4 flex items-center justify-between border-b border-gray-700">
+      <div className="bg-gray-800 p-4 flex items-center justify-between border-b border-gray-700">
         <div className="flex items-center space-x-3">
           <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
             <span className="text-lg">✨</span>
@@ -316,13 +329,6 @@ const ChatBot = () => {
         </div>
         <div className="flex items-center space-x-2">
           <button 
-            onClick={() => setShowSettings(!showSettings)}
-            className="p-1.5 rounded-lg hover:bg-gray-700 transition-colors"
-            title="Settings"
-          >
-            <FiSettings size={18} />
-          </button>
-          <button 
             onClick={() => setIsExpanded(!isExpanded)}
             className="p-1.5 rounded-lg hover:bg-gray-700 transition-colors"
           >
@@ -339,42 +345,8 @@ const ChatBot = () => {
         </div>
       </div>
 
-      {/* Settings Panel */}
-      {showSettings && (
-        <div className="absolute right-4 top-16 bg-gray-800/90 backdrop-blur-lg rounded-xl shadow-xl z-20 border border-gray-700 w-64">
-          <div className="p-4 border-b border-gray-700">
-            <h3 className="font-medium flex items-center">
-              <FiSettings className="mr-2" /> Settings
-            </h3>
-          </div>
-          <div className="p-4">
-            <div className="mb-4">
-              <label className="block text-sm text-gray-300 mb-2">Typing Speed</label>
-              <div className="flex items-center space-x-2">
-                <span className="text-xs">Slow</span>
-                <input
-                  type="range"
-                  min="20"
-                  max="5000"
-                  value={100 - typingSpeed}
-                  onChange={(e) => setTypingSpeed(5000 - parseInt(e.target.value))}
-                  className="flex-1"
-                />
-                <span className="text-xs">Fast</span>
-              </div>
-            </div>
-            <button
-              onClick={() => setShowSettings(false)}
-              className="w-full bg-blue-600 hover:bg-blue-700 py-2 rounded-lg transition-colors text-sm"
-            >
-              Save Settings
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* Chat Area */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-transparent">
+      <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-gray-900">
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full pb-16">
             <div className="w-24 h-24 mb-6 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
@@ -384,7 +356,7 @@ const ChatBot = () => {
               Hey, I'm Orion!
             </h3>
             <p className="text-gray-400 text-center mb-8 max-w-md">
-              Your AI assistant with full memory context. I remember all our past conversations to provide better help.
+              Your AI assistant ready to help with anything. Ask me questions, brainstorm ideas, or just chat!
             </p>
             
             {showTemplateButtons && (
@@ -433,7 +405,7 @@ const ChatBot = () => {
               className={`flex ${message.isBot ? 'justify-start' : 'justify-end'}`}
             >
               <div className={`max-w-[90%] md:max-w-[80%] rounded-2xl p-4 ${message.isBot ? 
-                'bg-gray-800/40 backdrop-blur-sm border border-gray-700' : 
+                'bg-gray-800/70 backdrop-blur-sm border border-gray-700' : 
                 'bg-gradient-to-br from-blue-600 to-blue-700 shadow-md'}`}
               >
                 {message.isBot && (
@@ -486,18 +458,18 @@ const ChatBot = () => {
           ))}
         </AnimatePresence>
         
-        {isBotTyping && (
+        {isTypingAnimation && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3 }}
             className="flex justify-start"
           >
-            <div className="bg-gray-800/40 backdrop-blur-sm border border-gray-700 rounded-2xl p-4 max-w-[80%]">
+            <div className="bg-gray-800/70 backdrop-blur-sm border border-gray-700 rounded-2xl p-4 max-w-[80%]">
               <div className="flex items-center space-x-2">
                 <div className="flex space-x-1">
                   <motion.span
-                    className="typing-dot"
+className="typing-dot"
                     animate={{ opacity: [0.2, 1, 0.2] }}
                     transition={{ duration: 1.2, repeat: Infinity }}
                   />
@@ -620,24 +592,22 @@ const ChatBot = () => {
                 <FiClock size={18} />
                 {memories.length > 0 && (
                   <span className="absolute -top-1 -right-1 bg-blue-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">
-                    {memories.length > 99 ? '99+' : memories.length}
+                    {memories.length > 9 ? '9+' : memories.length}
                   </span>
                 )}
               </button>
               
               {showMemoryPanel && (
-                <div className="absolute bottom-full mb-2 left-0 w-72 bg-gray-800/90 backdrop-blur-lg rounded-xl shadow-xl z-20 border border-gray-700 overflow-hidden">
+                <div className="absolute bottom-full mb-2 left-0 w-72 bg-gray-800 rounded-xl shadow-xl z-20 border border-gray-700 overflow-hidden">
                   <div className="p-3 border-b border-gray-700 flex justify-between items-center">
-                    <h4 className="font-medium flex items-center">
-                      <FiCpu className="mr-2" /> Memory Context
-                    </h4>
+                    <h4 className="font-medium">Conversation Memory</h4>
                     <div className="flex items-center space-x-2">
                       <button 
                         onClick={saveToMemory}
                         disabled={messages.length === 0}
                         className="text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded transition-colors disabled:opacity-50"
                       >
-                        Remember
+                        Remember current
                       </button>
                       <button 
                         onClick={() => setShowMemoryPanel(false)}
@@ -648,7 +618,7 @@ const ChatBot = () => {
                     </div>
                   </div>
                   
-                  <div className="max-h-64 overflow-y-auto scrollbar-thin">
+                  <div className="max-h-64 overflow-y-auto">
                     {memories.length === 0 ? (
                       <div className="p-4 text-center text-sm text-gray-400">
                         No memories yet. Important context will appear here.
@@ -711,7 +681,7 @@ const ChatBot = () => {
         )}
       </div>
       
-      <style jsx global>{`
+      <style jsx>{`
         .typing-dot {
           display: inline-block;
           width: 6px;
@@ -719,14 +689,13 @@ const ChatBot = () => {
           background-color: #9CA3AF;
           border-radius: 50%;
         }
-        .code-container {
+        .code-block {
           background: #1E1E1E;
-          border-radius: 8px;
+          border-radius: 6px;
           margin: 1em 0;
           overflow: hidden;
-          border: 1px solid #333;
         }
-        .code-toolbar {
+        .code-header {
           display: flex;
           justify-content: space-between;
           align-items: center;
@@ -735,39 +704,25 @@ const ChatBot = () => {
           color: #9CDCFE;
           font-size: 0.8em;
         }
-        .language-tag {
-          background: #333;
-          padding: 0.2em 0.5em;
-          border-radius: 4px;
-          font-size: 0.8em;
-        }
-        .copy-button {
+        .code-header .copy-btn {
           background: transparent;
-          border: 1px solid #555;
+          border: none;
           color: #D4D4D4;
           cursor: pointer;
-          padding: 0.2em 0.5em;
-          border-radius: 4px;
-          font-size: 0.8em;
-          display: flex;
-          align-items: center;
-          gap: 0.3em;
+          padding: 0.2em;
         }
-        .copy-button:hover {
-          background: #333;
+        .code-header .copy-btn:hover {
+          color: white;
         }
-        .code-block {
+        .code-block pre {
           margin: 0;
           padding: 1em;
           overflow-x: auto;
-          font-family: 'Fira Code', 'Courier New', monospace;
-          font-size: 0.9em;
-          line-height: 1.5;
-          color: #D4D4D4;
-          background: #1E1E1E;
         }
         .code-block code {
-          font-family: inherit;
+          font-family: 'Courier New', monospace;
+          color: #D4D4D4;
+          font-size: 0.9em;
         }
         .copy-notification {
           position: fixed;
@@ -787,25 +742,6 @@ const ChatBot = () => {
           20% { opacity: 1; }
           80% { opacity: 1; }
           100% { opacity: 0; }
-        }
-        .prose {
-          max-width: 100%;
-        }
-        .prose code:not(.code-block code) {
-          background: rgba(110, 118, 129, 0.4);
-          padding: 0.2em 0.4em;
-          border-radius: 4px;
-          font-size: 0.9em;
-        }
-        .prose pre {
-          margin: 0;
-        }
-        .prose ul, .prose ol {
-          padding-left: 1.5em;
-          margin: 0.5em 0;
-        }
-        .prose li {
-          margin: 0.25em 0;
         }
       `}</style>
     </div>
