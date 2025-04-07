@@ -469,7 +469,7 @@ N1 for memory technology, model lite preview free llm pre trained and training i
               <div className="flex items-center space-x-2">
                 <div className="flex space-x-1">
                   <motion.span
-className="typing-dot"
+                    className="typing-dot"
                     animate={{ opacity: [0.2, 1, 0.2] }}
                     transition={{ duration: 1.2, repeat: Infinity }}
                   />
