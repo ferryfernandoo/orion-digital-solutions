@@ -10,7 +10,7 @@ const ChatBot = () => {
   const [inputMessage, setInputMessage] = useState('');
   const [isBotTyping, setIsBotTyping] = useState(false);
   const [showTemplateButtons, setShowTemplateButtons] = useState(true);
-  const [typingSpeed] = useState(1); // Faster default typing speed (ms per character)
+  const [typingSpeed] = useState(2); // Faster default typing speed (ms per character)
   const [showFileOptions, setShowFileOptions] = useState(false);
   const [pendingFiles, setPendingFiles] = useState([]);
   const [chatHistory, setChatHistory] = useState([]);
@@ -128,14 +128,20 @@ const ChatBot = () => {
     return `Konteks Memori Jangka Panjang:\n${memoryContext}\n\n`;
   };
 
-  const typeMessage = async (fullText, callback) => {
-    let displayedText = '';
-    for (let i = 0; i < fullText.length; i++) {
-      displayedText += fullText[i];
-      callback(displayedText);
-      await new Promise(resolve => setTimeout(resolve, typingSpeed));
-    }
-  };
+ const typeMessage = async (fullText, callback) => {
+  let displayedText = '';
+  const chunkSize = 10; // Jumlah karakter per chunk
+  
+  for (let i = 0; i < fullText.length; i += chunkSize) {
+    // Ambil chunk berikutnya (maksimal 10 karakter)
+    const chunk = fullText.substr(i, chunkSize);
+    displayedText += chunk;
+    callback(displayedText);
+    
+    // Tunggu 2ms sebelum menampilkan chunk berikutnya
+    await new Promise(resolve => setTimeout(resolve, typingSpeed));
+  }
+};
 
   const generateWithProMode = async (prompt) => {
     // In Pro Mode, we generate multiple responses and combine the best parts
