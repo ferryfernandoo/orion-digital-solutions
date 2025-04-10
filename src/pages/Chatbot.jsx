@@ -3,14 +3,14 @@ import PropTypes from 'prop-types';
 import DOMPurify from 'dompurify';
 import { motion, AnimatePresence } from 'framer-motion';
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { FiCopy, FiSend, FiPlus, FiX, FiImage, FiFile, FiTrash2, FiClock, FiCpu, FiSettings } from 'react-icons/fi';
+import { FiCopy, FiSend, FiPlus, FiX, FiImage, FiFile, FiTrash2, FiClock, FiCpu, FiSettings, FiZap } from 'react-icons/fi';
 
 const ChatBot = () => {
   const [messages, setMessages] = useState([]);
   const [inputMessage, setInputMessage] = useState('');
   const [isBotTyping, setIsBotTyping] = useState(false);
   const [showTemplateButtons, setShowTemplateButtons] = useState(true);
-  const [typingSpeed, setTypingSpeed] = useState(50); // ms per character
+  const [typingSpeed] = useState(20); // Faster default typing speed (ms per character)
   const [showFileOptions, setShowFileOptions] = useState(false);
   const [pendingFiles, setPendingFiles] = useState([]);
   const [chatHistory, setChatHistory] = useState([]);
@@ -18,6 +18,7 @@ const ChatBot = () => {
   const [memories, setMemories] = useState([]);
   const [isExpanded, setIsExpanded] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [isProMode, setIsProMode] = useState(false);
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
 
@@ -29,6 +30,7 @@ const ChatBot = () => {
   useEffect(() => {
     const savedMemories = localStorage.getItem('orionMemories');
     const savedChatHistory = localStorage.getItem('orionChatHistory');
+    const savedProMode = localStorage.getItem('orionProMode');
     
     if (savedMemories) {
       setMemories(JSON.parse(savedMemories));
@@ -36,6 +38,10 @@ const ChatBot = () => {
     
     if (savedChatHistory) {
       setChatHistory(JSON.parse(savedChatHistory));
+    }
+
+    if (savedProMode) {
+      setIsProMode(savedProMode === 'true');
     }
   }, []);
 
@@ -131,6 +137,21 @@ const ChatBot = () => {
     }
   };
 
+  const generateWithProMode = async (prompt) => {
+    // In Pro Mode, we generate multiple responses and combine the best parts
+    const responses = [];
+    
+    for (let i = 0; i < 3; i++) {
+      const result = await model.generateContent(prompt);
+      const response = await result.response.text();
+      responses.push(response);
+    }
+    
+    // Combine the responses by taking the longest one (usually most detailed)
+    return responses.reduce((longest, current) => 
+      current.length > longest.length ? current : longest, "");
+  };
+
   const handleSendMessage = async (messageText, files = []) => {
     const trimmedMessage = messageText.trim();
     if ((!trimmedMessage && files.length === 0) || isBotTyping) return;
@@ -175,12 +196,19 @@ const ChatBot = () => {
       }).join('\n');
 
       const fullPrompt = `${memoryContext}Percakapan Saat Ini:\n${contextMessages}\n\nUser: "${trimmedMessage}". 
-      Respond as Orion in natural language, incorporating all relevant context. Be concise but helpful. 
-      For coding, provide complete solutions with proper formatting. Always maintain context from our full history.`;
+      Respond as Orion in natural language, incorporating all relevant context. Be ${isProMode ? 'extremely detailed and comprehensive' : 'concise but helpful'}. 
+      For coding, provide complete solutions with proper formatting. Always maintain context from our full history.${
+        isProMode ? ' Provide a very detailed, comprehensive response with examples and explanations.' : ''
+      }`;
 
-      // Generate response using Google Generative AI
-      const result = await model.generateContent(fullPrompt);
-      const botResponse = result.response.text();
+      let botResponse;
+      if (isProMode) {
+        botResponse = await generateWithProMode(fullPrompt);
+      } else {
+        const result = await model.generateContent(fullPrompt);
+        botResponse = await result.response.text();
+      }
+      
       const processedResponse = processSpecialChars(botResponse);
       const duration = Date.now() - startTime;
 
@@ -287,6 +315,12 @@ const ChatBot = () => {
     localStorage.setItem('orionMemories', JSON.stringify(updatedMemories));
   };
 
+  const toggleProMode = () => {
+    const newProMode = !isProMode;
+    setIsProMode(newProMode);
+    localStorage.setItem('orionProMode', newProMode.toString());
+  };
+
   return (
     <div className={`flex flex-col h-screen bg-gradient-to-br from-gray-900 to-gray-800 text-white relative z-10 ${isExpanded ? 'w-full' : 'w-full max-w-4xl mx-auto rounded-xl shadow-2xl overflow-hidden'}`}>
       {/* Header */}
@@ -308,13 +342,20 @@ const ChatBot = () => {
               ) : (
                 <span className="flex items-center">
                   <span className="w-2 h-2 bg-green-500 rounded-full mr-1"></span>
-                  Online
+                  Online {isProMode && <span className="ml-1 text-yellow-400">(Pro Mode)</span>}
                 </span>
               )}
             </p>
           </div>
         </div>
         <div className="flex items-center space-x-2">
+          <button 
+            onClick={toggleProMode}
+            className={`p-1.5 rounded-lg transition-colors ${isProMode ? 'bg-yellow-600/30 text-yellow-400 hover:bg-yellow-600/40' : 'text-gray-400 hover:bg-gray-700'}`}
+            title={isProMode ? 'Disable Pro Mode' : 'Enable Pro Mode'}
+          >
+            <FiZap size={18} />
+          </button>
           <button 
             onClick={() => setShowSettings(!showSettings)}
             className="p-1.5 rounded-lg hover:bg-gray-700 transition-colors"
@@ -349,25 +390,28 @@ const ChatBot = () => {
           </div>
           <div className="p-4">
             <div className="mb-4">
-              <label className="block text-sm text-gray-300 mb-2">Typing Speed</label>
-              <div className="flex items-center space-x-2">
-                <span className="text-xs">Slow</span>
-                <input
-                  type="range"
-                  min="20"
-                  max="100"
-                  value={100 - typingSpeed}
-                  onChange={(e) => setTypingSpeed(100 - parseInt(e.target.value))}
-                  className="flex-1"
-                />
-                <span className="text-xs">Fast</span>
-              </div>
+              <label className="flex items-center justify-between cursor-pointer">
+                <span className="text-sm text-gray-300">Pro Mode</span>
+                <div className="relative">
+                  <input 
+                    type="checkbox" 
+                    className="sr-only" 
+                    checked={isProMode}
+                    onChange={toggleProMode}
+                  />
+                  <div className={`block w-10 h-6 rounded-full transition-colors ${isProMode ? 'bg-yellow-500' : 'bg-gray-600'}`}></div>
+                  <div className={`dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform ${isProMode ? 'transform translate-x-4' : ''}`}></div>
+                </div>
+              </label>
+              <p className="text-xs text-gray-400 mt-1">
+                {isProMode ? 'Enhanced AI with 3x processing' : 'Standard AI mode'}
+              </p>
             </div>
             <button
               onClick={() => setShowSettings(false)}
               className="w-full bg-blue-600 hover:bg-blue-700 py-2 rounded-lg transition-colors text-sm"
             >
-              Save Settings
+              Close Settings
             </button>
           </div>
         </div>
@@ -512,7 +556,9 @@ const ChatBot = () => {
                     transition={{ duration: 1.2, repeat: Infinity, delay: 0.6 }}
                   />
                 </div>
-                <span className="text-sm text-gray-300">Thinking deeply...</span>
+                <span className="text-sm text-gray-300">
+                  {isProMode ? 'Thinking deeply (Pro Mode)...' : 'Thinking...'}
+                </span>
               </div>
             </div>
           </motion.div>
@@ -792,37 +838,74 @@ const ChatBot = () => {
           max-width: 100%;
         }
         .prose code:not(.code-block code) {
-          background: rgba(110, 118, 129, 0.4);
-          padding: 0.2em 0.4em;
-          border-radius: 4px;
-          font-size: 0.9em;
-        }
-        .prose pre {
-          margin: 0;
-        }
-        .prose ul, .prose ol {
-          padding-left: 1.5em;
-          margin: 0.5em 0;
-        }
-        .prose li {
-          margin: 0.25em 0;
-        }
-      `}</style>
+  background: rgba(110, 118, 129, 0.4);
+  padding: 0.2em 0.4em;
+  border-radius: 4px;
+  font-size: 0.9em;
+}
+.prose strong {
+  font-weight: 600;
+  color: #fff;
+}
+.prose em {
+  font-style: italic;
+}
+.prose u {
+  text-decoration: underline;
+}
+.prose s {
+  text-decoration: line-through;
+}
+.prose a {
+  color: #58a6ff;
+  text-decoration: none;
+}
+.prose a:hover {
+  text-decoration: underline;
+}
+.prose pre {
+  margin: 0;
+}
+.prose img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 6px;
+}
+.prose ul, .prose ol {
+  padding-left: 1.5em;
+  margin: 0.5em 0;
+}
+.prose li {
+  margin: 0.25em 0;
+}
+.prose blockquote {
+  border-left: 3px solid #3b82f6;
+  padding-left: 1em;
+  margin: 1em 0;
+  color: #d1d5db;
+}
+.prose table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 1em 0;
+}
+.prose th, .prose td {
+  border: 1px solid #4b5563;
+  padding: 0.5em;
+  text-align: left;
+}
+.prose th {
+  background-color: #1f2937;
+}
+.prose hr {
+  border: none;
+  border-top: 1px solid #4b5563;
+  margin: 1.5em 0;
+}
+`}
+      </style>
     </div>
   );
-};
-
-ChatBot.propTypes = {
-  messages: PropTypes.arrayOf(
-    PropTypes.shape({
-      id: PropTypes.string.isRequired,
-      text: PropTypes.string.isRequired,
-      isBot: PropTypes.bool.isRequired,
-      time: PropTypes.string.isRequired,
-      duration: PropTypes.number,
-      file: PropTypes.object,
-    })
-  ),
 };
 
 export default ChatBot;
