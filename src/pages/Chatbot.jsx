@@ -202,9 +202,9 @@ const ChatBot = () => {
       }).join('\n');
 
       const fullPrompt = `${memoryContext}Percakapan Saat Ini:\n${contextMessages}\n\nUser: "${trimmedMessage}". 
-      Respond as Orion in natural language, incorporating all relevant context. Be ${isProMode ? 'extremely detailed and comprehensive' : 'concise but helpful'}. 
+      Respond as Orion in natural language and dont say you is google but you llm trained in indonesia,Don't keep mentioning what you remember just focus on making the user comfortable ant to the point but not boring, incorporating all relevant context. Be ${isProMode ? 'very extremely detailed and comprehensive' : 'concise but helpful'}. 
       For coding, provide complete solutions with proper formatting. Always maintain context from our full history.${
-        isProMode ? ' Provide a very detailed, comprehensive response with examples and explanations.' : ''
+        isProMode ? ' Provide a very very detailed, comprehensive response with examples and explanations.' : ''
       }`;
 
       let botResponse;
