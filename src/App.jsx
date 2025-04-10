@@ -13,7 +13,8 @@ function App() {
 
   return (
     <div className="flex flex-col min-h-screen">
-      <Navbar />
+      {/* Tampilkan navbar hanya jika bukan di halaman ChatBot */}
+      {location.pathname !== "/chatbot" && <Navbar />}
       <main className="flex-grow">
         <Routes>
           <Route path="/" element={<Home />} />
