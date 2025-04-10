@@ -10,7 +10,7 @@ const ChatBot = () => {
   const [inputMessage, setInputMessage] = useState('');
   const [isBotTyping, setIsBotTyping] = useState(false);
   const [showTemplateButtons, setShowTemplateButtons] = useState(true);
-  const [typingSpeed] = useState(20); // Faster default typing speed (ms per character)
+  const [typingSpeed] = useState(1); // Faster default typing speed (ms per character)
   const [showFileOptions, setShowFileOptions] = useState(false);
   const [pendingFiles, setPendingFiles] = useState([]);
   const [chatHistory, setChatHistory] = useState([]);
