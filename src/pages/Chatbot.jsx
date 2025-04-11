@@ -3,14 +3,14 @@ import PropTypes from 'prop-types';
 import DOMPurify from 'dompurify';
 import { motion, AnimatePresence } from 'framer-motion';
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { FiCopy, FiSend, FiPlus, FiX, FiImage, FiFile, FiTrash2, FiClock, FiCpu, FiSettings, FiZap } from 'react-icons/fi';
+import { FiCopy, FiSend, FiPlus, FiX, FiImage, FiFile, FiTrash2, FiClock, FiCpu, FiSettings, FiZap, FiStopCircle } from 'react-icons/fi';
 
 const ChatBot = () => {
   const [messages, setMessages] = useState([]);
   const [inputMessage, setInputMessage] = useState('');
   const [isBotTyping, setIsBotTyping] = useState(false);
   const [showTemplateButtons, setShowTemplateButtons] = useState(true);
-  const [typingSpeed] = useState(2); // Faster default typing speed (ms per character)
+  const [typingSpeed] = useState(2);
   const [showFileOptions, setShowFileOptions] = useState(false);
   const [pendingFiles, setPendingFiles] = useState([]);
   const [chatHistory, setChatHistory] = useState([]);
@@ -19,6 +19,7 @@ const ChatBot = () => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [isProMode, setIsProMode] = useState(false);
+  const [abortController, setAbortController] = useState(null);
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
 
@@ -26,30 +27,19 @@ const ChatBot = () => {
   const genAI = new GoogleGenerativeAI("AIzaSyDSTgkkROL7mjaGKoD2vnc8l2UptNCbvHk");
   const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
-  // Load memories and chat history from localStorage on component mount
+  // Load memories and chat history from localStorage
   useEffect(() => {
     const savedMemories = localStorage.getItem('orionMemories');
     const savedChatHistory = localStorage.getItem('orionChatHistory');
     const savedProMode = localStorage.getItem('orionProMode');
     
-    if (savedMemories) {
-      setMemories(JSON.parse(savedMemories));
-    }
-    
-    if (savedChatHistory) {
-      setChatHistory(JSON.parse(savedChatHistory));
-    }
-
-    if (savedProMode) {
-      setIsProMode(savedProMode === 'true');
-    }
+    if (savedMemories) setMemories(JSON.parse(savedMemories));
+    if (savedChatHistory) setChatHistory(JSON.parse(savedChatHistory));
+    if (savedProMode) setIsProMode(savedProMode === 'true');
   }, []);
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({
-      behavior: 'smooth',
-      block: 'nearest',
-    });
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   };
 
   useEffect(() => {
@@ -68,17 +58,32 @@ const ChatBot = () => {
   const summarizeConversation = async (conversation) => {
     try {
       const prompt = `Buat ringkasan sangat singkat sepadat padatnya (maks 1 kalimat) dari percakapan ini dalam bahasa yang sama dengan percakapan. Fokus pada fakta kunci, keputusan, dan detail penting. HILANGKAN semua salam dan basa-basi.\n\nPercakapan:\n${conversation}`;
-      
       const result = await model.generateContent(prompt);
       const response = await result.response.text();
-      
-      return response.replace(/[{}]/g, '')
-        .replace(/json/gi, '')
-        .replace(/```/g, '')
-        .trim() || "Ringkasan tidak tersedia";
+      return response.replace(/[{}]/g, '').replace(/json/gi, '').replace(/```/g, '').trim() || "Ringkasan tidak tersedia";
     } catch (error) {
       console.error("Error summarizing conversation:", error);
       return "Tidak bisa membuat ringkasan";
+    }
+  };
+
+  const findRelevantMemories = async (query) => {
+    if (memories.length === 0) return '';
+    
+    try {
+      const memoryTexts = memories.map(m => `[Memory ${m.date}]: ${m.summary}`).join('\n');
+      const prompt = `Daftar memori:\n${memoryTexts}\n\nPertanyaan: "${query}"\n\nIdentifikasi hanya memori yang paling relevan dengan pertanyaan (maks 3). Berikan hanya ID memori yang dipisahkan koma, atau kosong jika tidak ada yang relevan.`;
+      
+      const result = await model.generateContent(prompt);
+      const response = await result.response.text();
+      const relevantIds = response.trim().split(',').map(id => id.trim()).filter(Boolean);
+      
+      return memories.filter(m => relevantIds.includes(m.id))
+        .map(m => `[Memory ${m.date}]: ${m.summary}\nDetail: ${m.messages.map(msg => `${msg.isBot ? 'Orion' : 'User'}: ${msg.text.replace(/<[^>]*>?/gm, '')}`).join('\n')}`)
+        .join('\n\n');
+    } catch (error) {
+      console.error("Error finding relevant memories:", error);
+      return '';
     }
   };
 
@@ -87,17 +92,13 @@ const ChatBot = () => {
     
     try {
       setIsBotTyping(true);
-      
-      const conversationText = messages.map(msg => 
-        `${msg.isBot ? 'Orion' : 'User'}: ${msg.text}`
-      ).join('\n');
-      
+      const conversationText = messages.map(msg => `${msg.isBot ? 'Orion' : 'User'}: ${msg.text}`).join('\n');
       const summary = await summarizeConversation(conversationText);
       
       if (summary && !summary.includes("tidak bisa")) {
         const newMemory = {
           id: Date.now().toString(),
-          summary: summary,
+          summary,
           date: new Date().toLocaleString(),
           messages: [...messages]
         };
@@ -113,49 +114,47 @@ const ChatBot = () => {
     }
   };
 
-  const getFullMemoryContext = () => {
-    if (memories.length === 0) return '';
-    
-    // Combine all memories into context
-    const memoryContext = memories.map(memory => 
-      `Memory [${memory.date}]: ${memory.summary}\nDetails: ${
-        memory.messages.map(msg => 
-          `${msg.isBot ? 'Orion' : 'User'}: ${msg.text.replace(/<[^>]*>?/gm, '')}`
-        ).join('\n')
-      }`
-    ).join('\n\n');
-    
-    return `Konteks Memori Jangka Panjang:\n${memoryContext}\n\n`;
-  };
-
- const typeMessage = async (fullText, callback) => {
-  let displayedText = '';
-  const chunkSize = 10; // Jumlah karakter per chunk
-  
-  for (let i = 0; i < fullText.length; i += chunkSize) {
-    // Ambil chunk berikutnya (maksimal 10 karakter)
-    const chunk = fullText.substr(i, chunkSize);
-    displayedText += chunk;
-    callback(displayedText);
-    
-    // Tunggu 2ms sebelum menampilkan chunk berikutnya
-    await new Promise(resolve => setTimeout(resolve, typingSpeed));
-  }
-};
-
-  const generateWithProMode = async (prompt) => {
-    // In Pro Mode, we generate multiple responses and combine the best parts
-    const responses = [];
-    
-    for (let i = 0; i < 3; i++) {
-      const result = await model.generateContent(prompt);
-      const response = await result.response.text();
-      responses.push(response);
+  const typeMessage = async (fullText, callback) => {
+    if (isProMode) {
+      callback(fullText);
+      return;
     }
     
-    // Combine the responses by taking the longest one (usually most detailed)
+    let displayedText = '';
+    const chunkSize = 10;
+    
+    for (let i = 0; i < fullText.length; i += chunkSize) {
+      if (abortController?.signal.aborted) break;
+      const chunk = fullText.substr(i, chunkSize);
+      displayedText += chunk;
+      callback(displayedText);
+      await new Promise(resolve => setTimeout(resolve, typingSpeed));
+    }
+  };
+
+  const generateWithProMode = async (prompt) => {
+    // In Pro Mode, we generate 4 responses and combine the best parts
+    const generationPromises = [];
+    
+    for (let i = 0; i < 4; i++) {
+      generationPromises.push(
+        model.generateContent(prompt)
+          .then(result => result.response.text())
+          .catch(() => '')
+      );
+    }
+    
+    const responses = await Promise.all(generationPromises);
     return responses.reduce((longest, current) => 
       current.length > longest.length ? current : longest, "");
+  };
+
+  const stopGeneration = () => {
+    if (abortController) {
+      abortController.abort();
+      setAbortController(null);
+    }
+    setIsBotTyping(false);
   };
 
   const handleSendMessage = async (messageText, files = []) => {
@@ -163,6 +162,7 @@ const ChatBot = () => {
     if ((!trimmedMessage && files.length === 0) || isBotTyping) return;
 
     const controller = new AbortController();
+    setAbortController(controller);
     const timeoutId = setTimeout(() => controller.abort(), 300000);
 
     try {
@@ -193,18 +193,21 @@ const ChatBot = () => {
 
       const startTime = Date.now();
 
-      // Get full memory context
-      const memoryContext = getFullMemoryContext();
+      // Find relevant memories using AI
+      const relevantMemories = await findRelevantMemories(trimmedMessage);
       
       // Combine chat history into prompt
       const contextMessages = updatedHistory.slice(-15).map(msg => {
         return msg.role === 'user' ? `User: ${msg.content}` : `Orion: ${msg.content}`;
       }).join('\n');
 
-      const fullPrompt = `${memoryContext}Percakapan Saat Ini:\n${contextMessages}\n\nUser: "${trimmedMessage}". 
-      Respond as Orion in natural language and dont say you is google but you llm trained in indonesia,Don't keep mentioning what you remember just focus on making the user comfortable ant to the point but not boring, incorporating all relevant context. Be ${isProMode ? 'very extremely detailed and comprehensive' : 'concise but helpful'}. 
-      For coding, provide complete solutions with proper formatting. Always maintain context from our full history.${
-        isProMode ? ' Provide a very very detailed, comprehensive response with examples and explanations.' : ''
+      const fullPrompt = `${
+        relevantMemories ? `Konteks Memori Relevan:\n${relevantMemories}\n\n` : ''
+      }Percakapan Saat Ini:\n${contextMessages}\n\nUser: "${trimmedMessage}". 
+      Respond as Orion in natural language. Don't mention memories explicitly, just incorporate relevant context naturally. Be ${
+        isProMode ? 'extremely detailed and comprehensive (4x processing)' : 'concise but helpful'
+      }. For coding, provide complete solutions with proper formatting. Always maintain context.${
+        isProMode ? ' Provide a super detailed response with examples, explanations, and multiple perspectives.' : ''
       }`;
 
       let botResponse;
@@ -218,22 +221,24 @@ const ChatBot = () => {
       const processedResponse = processSpecialChars(botResponse);
       const duration = Date.now() - startTime;
 
-      // Type out the message with animation
+      // Type out the message with animation (only in normal mode)
       const messageId = Date.now().toString();
       setMessages(prev => [...prev, {
         id: messageId,
-        text: '',
+        text: isProMode ? processedResponse : '',
         isBot: true,
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         duration,
         file: null
       }]);
 
-      await typeMessage(processedResponse, (typedText) => {
-        setMessages(prev => prev.map(msg => 
-          msg.id === messageId ? { ...msg, text: typedText } : msg
-        ));
-      });
+      if (!isProMode) {
+        await typeMessage(processedResponse, (typedText) => {
+          setMessages(prev => prev.map(msg => 
+            msg.id === messageId ? { ...msg, text: typedText } : msg
+          ));
+        });
+      }
 
       // Add bot response to chat history
       const botMessage = { role: 'assistant', content: botResponse };
@@ -243,13 +248,14 @@ const ChatBot = () => {
 
     } catch (error) {
       const errorMessage = error.name === 'AbortError' 
-        ? 'Request timeout after 30s. Try again.'
+        ? 'Response stopped by user'
         : 'Waduh, ada yang salah nih sama Orion! Gak konek ke servernya...';
       
       setMessages(prev => [...prev, createMessageObject(errorMessage, true)]);
     } finally {
       setIsBotTyping(false);
       clearTimeout(timeoutId);
+      setAbortController(null);
     }
   };
 
@@ -328,7 +334,7 @@ const ChatBot = () => {
   };
 
   return (
-    <div className={`flex flex-col h-screen bg-gradient-to-br from-gray-900 to-gray-800 text-white relative z-10 ${isExpanded ? 'w-full' : 'w-full max-w-4xl mx-auto rounded-xl shadow-2xl overflow-hidden'}`}>
+    <div className={`flex flex-col h-screen bg-gradient-to-br from-gray-900 to-gray-800 text-white relative z-10 ${isExpanded ? 'w-full' : 'w-full max-w-6xl mx-auto rounded-xl shadow-2xl overflow-hidden'}`}>
       {/* Header */}
       <div className="bg-gray-800/80 backdrop-blur-md p-4 flex items-center justify-between border-b border-gray-700">
         <div className="flex items-center space-x-3">
@@ -410,7 +416,7 @@ const ChatBot = () => {
                 </div>
               </label>
               <p className="text-xs text-gray-400 mt-1">
-                {isProMode ? 'Enhanced AI with 3x processing' : 'Standard AI mode'}
+                {isProMode ? 'Enhanced AI with 4x processing' : 'Standard AI mode'}
               </p>
             </div>
             <button
@@ -434,7 +440,7 @@ const ChatBot = () => {
               Hey, I'm Orion!
             </h3>
             <p className="text-gray-400 text-center mb-8 max-w-md">
-              Your AI assistant with full memory context. I remember all our past conversations to provide better help.
+              Your AI assistant with intelligent memory. I automatically find and use relevant past conversations.
             </p>
             
             {showTemplateButtons && (
@@ -482,8 +488,8 @@ const ChatBot = () => {
               transition={{ duration: 0.3 }}
               className={`flex ${message.isBot ? 'justify-start' : 'justify-end'}`}
             >
-              <div className={`max-w-[90%] md:max-w-[80%] rounded-2xl p-4 ${message.isBot ? 
-                'bg-gray-800/40 backdrop-blur-sm border border-gray-700' : 
+              <div className={`max-w-[90%] md:max-w-[80%] rounded-xl p-4 ${message.isBot ? 
+                'bg-gray-800/40 backdrop-blur-sm border border-gray-700 w-full' : 
                 'bg-gradient-to-br from-blue-600 to-blue-700 shadow-md'}`}
               >
                 {message.isBot && (
@@ -508,7 +514,7 @@ const ChatBot = () => {
                   </div>
                 ) : (
                   <div 
-                    className={`prose prose-invert max-w-none ${message.isBot ? 'text-gray-100' : 'text-white'}`}
+                    className={`${message.isBot ? 'text-gray-100 text-sm' : 'text-white'} max-w-none`}
                     dangerouslySetInnerHTML={{ __html: message.text }} 
                   />
                 )}
@@ -543,7 +549,7 @@ const ChatBot = () => {
             transition={{ duration: 0.3 }}
             className="flex justify-start"
           >
-            <div className="bg-gray-800/40 backdrop-blur-sm border border-gray-700 rounded-2xl p-4 max-w-[80%]">
+            <div className="bg-gray-800/40 backdrop-blur-sm border border-gray-700 rounded-xl p-4 max-w-[80%]">
               <div className="flex items-center space-x-2">
                 <div className="flex space-x-1">
                   <motion.span
@@ -563,7 +569,7 @@ const ChatBot = () => {
                   />
                 </div>
                 <span className="text-sm text-gray-300">
-                  {isProMode ? 'Thinking deeply (Pro Mode)...' : 'Thinking...'}
+                  {isProMode ? 'Processing deeply (4x)...' : 'Thinking...'}
                 </span>
               </div>
             </div>
@@ -641,15 +647,25 @@ const ChatBot = () => {
                 </button>
               )}
               
-              <button
-                onClick={() => handleSendMessage(inputMessage, pendingFiles)}
-                disabled={(!inputMessage.trim() && pendingFiles.length === 0) || isBotTyping}
-                className={`p-1.5 rounded-full transition-all ${inputMessage.trim() || pendingFiles.length > 0 ? 
-                  'bg-blue-500 hover:bg-blue-600 text-white' : 
-                  'text-gray-500 hover:text-gray-300'}`}
-              >
-                <FiSend size={18} />
-              </button>
+              {isBotTyping ? (
+                <button
+                  onClick={stopGeneration}
+                  className="p-1.5 rounded-full bg-red-500 hover:bg-red-600 text-white transition-colors"
+                  title="Stop generation"
+                >
+                  <FiStopCircle size={18} />
+                </button>
+              ) : (
+                <button
+                  onClick={() => handleSendMessage(inputMessage, pendingFiles)}
+                  disabled={(!inputMessage.trim() && pendingFiles.length === 0) || isBotTyping}
+                  className={`p-1.5 rounded-full transition-all ${inputMessage.trim() || pendingFiles.length > 0 ? 
+                    'bg-blue-500 hover:bg-blue-600 text-white' : 
+                    'text-gray-500 hover:text-gray-300'}`}
+                >
+                  <FiSend size={18} />
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -844,72 +860,71 @@ const ChatBot = () => {
           max-width: 100%;
         }
         .prose code:not(.code-block code) {
-  background: rgba(110, 118, 129, 0.4);
-  padding: 0.2em 0.4em;
-  border-radius: 4px;
-  font-size: 0.9em;
-}
-.prose strong {
-  font-weight: 600;
-  color: #fff;
-}
-.prose em {
-  font-style: italic;
-}
-.prose u {
-  text-decoration: underline;
-}
-.prose s {
-  text-decoration: line-through;
-}
-.prose a {
-  color: #58a6ff;
-  text-decoration: none;
-}
-.prose a:hover {
-  text-decoration: underline;
-}
-.prose pre {
-  margin: 0;
-}
-.prose img {
-  max-width: 100%;
-  height: auto;
-  border-radius: 6px;
-}
-.prose ul, .prose ol {
-  padding-left: 1.5em;
-  margin: 0.5em 0;
-}
-.prose li {
-  margin: 0.25em 0;
-}
-.prose blockquote {
-  border-left: 3px solid #3b82f6;
-  padding-left: 1em;
-  margin: 1em 0;
-  color: #d1d5db;
-}
-.prose table {
-  border-collapse: collapse;
-  width: 100%;
-  margin: 1em 0;
-}
-.prose th, .prose td {
-  border: 1px solid #4b5563;
-  padding: 0.5em;
-  text-align: left;
-}
-.prose th {
-  background-color: #1f2937;
-}
-.prose hr {
-  border: none;
-  border-top: 1px solid #4b5563;
-  margin: 1.5em 0;
-}
-`}
-      </style>
+          background: rgba(110, 118, 129, 0.4);
+          padding: 0.2em 0.4em;
+          border-radius: 4px;
+          font-size: 0.9em;
+        }
+        .prose strong {
+          font-weight: 600;
+          color: #fff;
+        }
+        .prose em {
+          font-style: italic;
+        }
+        .prose u {
+          text-decoration: underline;
+        }
+        .prose s {
+          text-decoration: line-through;
+        }
+        .prose a {
+          color: #58a6ff;
+          text-decoration: none;
+        }
+        .prose a:hover {
+          text-decoration: underline;
+        }
+        .prose pre {
+          margin: 0;
+        }
+        .prose img {
+          max-width: 100%;
+          height: auto;
+          border-radius: 6px;
+        }
+        .prose ul, .prose ol {
+          padding-left: 1.5em;
+          margin: 0.5em 0;
+        }
+        .prose li {
+          margin: 0.25em 0;
+        }
+        .prose blockquote {
+          border-left: 3px solid #3b82f6;
+          padding-left: 1em;
+          margin: 1em 0;
+          color: #d1d5db;
+        }
+        .prose table {
+          border-collapse: collapse;
+          width: 100%;
+          margin: 1em 0;
+        }
+        .prose th, .prose td {
+          border: 1px solid #4b5563;
+          padding: 0.5em;
+          text-align: left;
+        }
+        .prose th {
+          background-color: #1f2937;
+        }
+        .prose hr {
+          border: none;
+          border-top: 1px solid #4b5563;
+          margin: 1.5em 0;
+        }
+      `}</style>
     </div>
   );
 };
