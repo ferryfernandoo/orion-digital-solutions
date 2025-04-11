@@ -95,7 +95,7 @@ const Home = () => {
               onClick={() => navigate("/chatbot")}
               variants={buttonVariants}
             >
-              Try Our First AI Chat
+              Start AI Chat
             </motion.button>
           </motion.div>
 
