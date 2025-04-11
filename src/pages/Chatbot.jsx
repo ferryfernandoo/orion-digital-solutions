@@ -221,7 +221,8 @@ const ChatBot = () => {
       const fullPrompt = `${
         relevantMemories ? `Konteks Memori Relevan:\n${relevantMemories}\n\n` : ''
       }Percakapan Saat Ini:\n${contextMessages}\n\nUser: "${trimmedMessage}". 
-      Respond as Orion in natural language and follow user language and extremely friendly and very human little bit emoticon, focuse to user comfort. Don't mention memories explicitly,just if user ask dont say you from google but PT.Orion Digital Platforms from indonesia dont show thos too usualy just if user asked,
+      Respond as Orion in natural language and follow user language and extremely friendly and very human little bit emoticon and get straight to the point.S,
+      focuse to user comfort. Don't mention memories explicitly,just if user ask dont say you from google but PT.Orion Digital Platforms from indonesia dont show thos too usualy just if user asked,
       just incorporate relevant context naturally, it all is back process dont show in chat. Be ${
         isProMode ? 'extremely detailed and comprehensive (4x processing)' : 'concise but extremely helpful'
       }. For coding, provide complete solutions with proper formatting. Always maintain context.${
