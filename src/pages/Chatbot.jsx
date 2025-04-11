@@ -10,7 +10,7 @@ const ChatBot = () => {
   const [inputMessage, setInputMessage] = useState('');
   const [isBotTyping, setIsBotTyping] = useState(false);
   const [showTemplateButtons, setShowTemplateButtons] = useState(true);
-  const [typingSpeed] = useState(2);
+  const [typingSpeed] = useState(30); // Faster typing speed
   const [showFileOptions, setShowFileOptions] = useState(false);
   const [pendingFiles, setPendingFiles] = useState([]);
   const [chatHistory, setChatHistory] = useState([]);
@@ -21,6 +21,7 @@ const ChatBot = () => {
   const [isProMode, setIsProMode] = useState(false);
   const [abortController, setAbortController] = useState(null);
   const messagesEndRef = useRef(null);
+  const messagesContainerRef = useRef(null);
   const textareaRef = useRef(null);
 
   // Initialize Google Generative AI
@@ -38,12 +39,16 @@ const ChatBot = () => {
     if (savedProMode) setIsProMode(savedProMode === 'true');
   }, []);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-  };
-
+  // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
-    scrollToBottom();
+    if (messagesContainerRef.current) {
+      const container = messagesContainerRef.current;
+      const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 100;
+      
+      if (isNearBottom) {
+        container.scrollTop = container.scrollHeight;
+      }
+    }
   }, [messages]);
 
   const createMessageObject = (text, isBot, duration = 0, file = null) => ({
@@ -79,8 +84,7 @@ const ChatBot = () => {
       const relevantIds = response.trim().split(',').map(id => id.trim()).filter(Boolean);
       
       return memories.filter(m => relevantIds.includes(m.id))
-        .map(m => `[Memory ${m.date}]: ${m.summary}\nDetail: ${m.messages.map(msg => `${msg.isBot ? 'Orion' : 'User'}: ${msg.text.replace(/<[^>]*>?/gm, '')}`).join('\n')}`)
-        .join('\n\n');
+        .map(m => `[Memory ${m.date}]: ${m.summary}\nDetail: ${m.messages.map(msg => `${msg.isBot ? 'Orion' : 'User'}: ${msg.text.replace(/<[^>]*>?/gm, '')}`).join('\n\n');
     } catch (error) {
       console.error("Error finding relevant memories:", error);
       return '';
@@ -121,7 +125,7 @@ const ChatBot = () => {
     }
     
     let displayedText = '';
-    const chunkSize = 10;
+    const chunkSize = 5; // Smaller chunks for smoother typing
     
     for (let i = 0; i < fullText.length; i += chunkSize) {
       if (abortController?.signal.aborted) break;
@@ -133,7 +137,6 @@ const ChatBot = () => {
   };
 
   const generateWithProMode = async (prompt) => {
-    // In Pro Mode, we generate 4 responses and combine the best parts
     const generationPromises = [];
     
     for (let i = 0; i < 4; i++) {
@@ -334,16 +337,16 @@ const ChatBot = () => {
   };
 
   return (
-    <div className={`flex flex-col h-screen bg-gradient-to-br from-gray-900 to-gray-800 text-white relative z-10 ${isExpanded ? 'w-full' : 'w-full max-w-6xl mx-auto rounded-xl shadow-2xl overflow-hidden'}`}>
+    <div className={`flex flex-col h-screen bg-white text-gray-900 relative z-10 ${isExpanded ? 'w-full' : 'w-full max-w-6xl mx-auto rounded-none shadow-none'}`}>
       {/* Header */}
-      <div className="bg-gray-800/80 backdrop-blur-md p-4 flex items-center justify-between border-b border-gray-700">
+      <div className="bg-white border-b border-gray-200 p-4 flex items-center justify-between sticky top-0 z-10">
         <div className="flex items-center space-x-3">
           <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
-            <span className="text-lg">✨</span>
+            <span className="text-lg text-white">✨</span>
           </div>
           <div>
             <h2 className="font-bold text-lg">Orion AI</h2>
-            <p className="text-xs opacity-75 flex items-center">
+            <p className="text-xs text-gray-500 flex items-center">
               {isBotTyping ? (
                 <span className="flex items-center">
                   <span className="typing-dot"></span>
@@ -354,7 +357,7 @@ const ChatBot = () => {
               ) : (
                 <span className="flex items-center">
                   <span className="w-2 h-2 bg-green-500 rounded-full mr-1"></span>
-                  Online {isProMode && <span className="ml-1 text-yellow-400">(Pro Mode)</span>}
+                  Online {isProMode && <span className="ml-1 text-yellow-600">(Pro Mode)</span>}
                 </span>
               )}
             </p>
@@ -363,21 +366,21 @@ const ChatBot = () => {
         <div className="flex items-center space-x-2">
           <button 
             onClick={toggleProMode}
-            className={`p-1.5 rounded-lg transition-colors ${isProMode ? 'bg-yellow-600/30 text-yellow-400 hover:bg-yellow-600/40' : 'text-gray-400 hover:bg-gray-700'}`}
+            className={`p-1.5 rounded-lg transition-colors ${isProMode ? 'bg-yellow-100 text-yellow-600 hover:bg-yellow-200' : 'text-gray-500 hover:bg-gray-100'}`}
             title={isProMode ? 'Disable Pro Mode' : 'Enable Pro Mode'}
           >
             <FiZap size={18} />
           </button>
           <button 
             onClick={() => setShowSettings(!showSettings)}
-            className="p-1.5 rounded-lg hover:bg-gray-700 transition-colors"
+            className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors text-gray-500"
             title="Settings"
           >
             <FiSettings size={18} />
           </button>
           <button 
             onClick={() => setIsExpanded(!isExpanded)}
-            className="p-1.5 rounded-lg hover:bg-gray-700 transition-colors"
+            className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors text-gray-500"
           >
             {isExpanded ? (
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -394,16 +397,16 @@ const ChatBot = () => {
 
       {/* Settings Panel */}
       {showSettings && (
-        <div className="absolute right-4 top-16 bg-gray-800/90 backdrop-blur-lg rounded-xl shadow-xl z-20 border border-gray-700 w-64">
-          <div className="p-4 border-b border-gray-700">
-            <h3 className="font-medium flex items-center">
+        <div className="absolute right-4 top-16 bg-white rounded-xl shadow-lg z-20 border border-gray-200 w-64">
+          <div className="p-4 border-b border-gray-200">
+            <h3 className="font-medium flex items-center text-gray-800">
               <FiSettings className="mr-2" /> Settings
             </h3>
           </div>
           <div className="p-4">
             <div className="mb-4">
               <label className="flex items-center justify-between cursor-pointer">
-                <span className="text-sm text-gray-300">Pro Mode</span>
+                <span className="text-sm text-gray-700">Pro Mode</span>
                 <div className="relative">
                   <input 
                     type="checkbox" 
@@ -411,17 +414,17 @@ const ChatBot = () => {
                     checked={isProMode}
                     onChange={toggleProMode}
                   />
-                  <div className={`block w-10 h-6 rounded-full transition-colors ${isProMode ? 'bg-yellow-500' : 'bg-gray-600'}`}></div>
+                  <div className={`block w-10 h-6 rounded-full transition-colors ${isProMode ? 'bg-yellow-500' : 'bg-gray-300'}`}></div>
                   <div className={`dot absolute left-1 top-1 bg-white w-4 h-4 rounded-full transition-transform ${isProMode ? 'transform translate-x-4' : ''}`}></div>
                 </div>
               </label>
-              <p className="text-xs text-gray-400 mt-1">
+              <p className="text-xs text-gray-500 mt-1">
                 {isProMode ? 'Enhanced AI with 4x processing' : 'Standard AI mode'}
               </p>
             </div>
             <button
               onClick={() => setShowSettings(false)}
-              className="w-full bg-blue-600 hover:bg-blue-700 py-2 rounded-lg transition-colors text-sm"
+              className="w-full bg-blue-600 hover:bg-blue-700 py-2 rounded-lg transition-colors text-sm text-white"
             >
               Close Settings
             </button>
@@ -430,16 +433,19 @@ const ChatBot = () => {
       )}
 
       {/* Chat Area */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-transparent">
+      <div 
+        ref={messagesContainerRef}
+        className="flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent"
+      >
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full pb-16">
             <div className="w-24 h-24 mb-6 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
-              <span className="text-4xl">✨</span>
+              <span className="text-4xl text-white">✨</span>
             </div>
-            <h3 className="text-3xl font-bold text-center mb-2">
+            <h3 className="text-3xl font-bold text-center mb-2 text-gray-800">
               Hey, I'm Orion!
             </h3>
-            <p className="text-gray-400 text-center mb-8 max-w-md">
+            <p className="text-gray-500 text-center mb-8 max-w-md">
               Your AI assistant with intelligent memory. I automatically find and use relevant past conversations.
             </p>
             
@@ -447,31 +453,31 @@ const ChatBot = () => {
               <div className="grid grid-cols-2 gap-3 w-full max-w-md">
                 <button
                   onClick={() => handleTemplateButtonClick("Hello Orion! How are you today?")}
-                  className="bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-xl p-3 text-sm transition-colors text-left"
+                  className="bg-white hover:bg-gray-50 border border-gray-200 rounded-xl p-3 text-sm transition-colors text-left"
                 >
-                  <span className="font-medium">Say hello</span>
-                  <p className="text-gray-400 text-xs mt-1">Start a conversation</p>
+                  <span className="font-medium text-gray-800">Say hello</span>
+                  <p className="text-gray-500 text-xs mt-1">Start a conversation</p>
                 </button>
                 <button
                   onClick={() => handleTemplateButtonClick("Brainstorm some creative ideas for my project about...")}
-                  className="bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-xl p-3 text-sm transition-colors text-left"
+                  className="bg-white hover:bg-gray-50 border border-gray-200 rounded-xl p-3 text-sm transition-colors text-left"
                 >
-                  <span className="font-medium">Brainstorm ideas</span>
-                  <p className="text-gray-400 text-xs mt-1">Get creative suggestions</p>
+                  <span className="font-medium text-gray-800">Brainstorm ideas</span>
+                  <p className="text-gray-500 text-xs mt-1">Get creative suggestions</p>
                 </button>
                 <button
                   onClick={() => handleTemplateButtonClick("Explain how machine learning works in simple terms")}
-                  className="bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-xl p-3 text-sm transition-colors text-left"
+                  className="bg-white hover:bg-gray-50 border border-gray-200 rounded-xl p-3 text-sm transition-colors text-left"
                 >
-                  <span className="font-medium">Explain something</span>
-                  <p className="text-gray-400 text-xs mt-1">Get clear explanations</p>
+                  <span className="font-medium text-gray-800">Explain something</span>
+                  <p className="text-gray-500 text-xs mt-1">Get clear explanations</p>
                 </button>
                 <button
                   onClick={() => handleTemplateButtonClick("Help me debug this code...")}
-                  className="bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-xl p-3 text-sm transition-colors text-left"
+                  className="bg-white hover:bg-gray-50 border border-gray-200 rounded-xl p-3 text-sm transition-colors text-left"
                 >
-                  <span className="font-medium">Code help</span>
-                  <p className="text-gray-400 text-xs mt-1">Debug or explain code</p>
+                  <span className="font-medium text-gray-800">Code help</span>
+                  <p className="text-gray-500 text-xs mt-1">Debug or explain code</p>
                 </button>
               </div>
             )}
@@ -482,45 +488,45 @@ const ChatBot = () => {
           {messages.map((message) => (
             <motion.div
               key={message.id}
-              initial={{ opacity: 0, y: 20 }}
+              initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              transition={{ duration: 0.3 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.2 }}
               className={`flex ${message.isBot ? 'justify-start' : 'justify-end'}`}
             >
-              <div className={`max-w-[90%] md:max-w-[80%] rounded-xl p-4 ${message.isBot ? 
-                'bg-gray-800/40 backdrop-blur-sm border border-gray-700 w-full' : 
-                'bg-gradient-to-br from-blue-600 to-blue-700 shadow-md'}`}
+              <div className={`max-w-[90%] md:max-w-[80%] ${message.isBot ? 
+                'bg-white border border-gray-200' : 
+                'bg-blue-600 text-white'} rounded-lg p-3`}
               >
                 {message.isBot && (
-                  <div className="flex items-center mb-1.5">
-                    <div className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center mr-2">
-                      <span className="text-xs">✨</span>
+                  <div className="flex items-center mb-1">
+                    <div className="w-5 h-5 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center mr-2">
+                      <span className="text-xs text-white">✨</span>
                     </div>
-                    <span className="text-xs font-medium text-gray-300">Orion</span>
+                    <span className="text-xs font-medium text-gray-500">Orion</span>
                   </div>
                 )}
                 
                 {message.file ? (
                   <div>
-                    <p className="text-sm mb-2">File: {message.file.name}</p>
+                    <p className={`text-sm mb-2 ${message.isBot ? 'text-gray-700' : 'text-white'}`}>File: {message.file.name}</p>
                     {message.file.type.startsWith('image/') && (
                       <img 
                         src={URL.createObjectURL(message.file)} 
                         alt="Uploaded" 
-                        className="mt-2 max-w-full h-auto rounded-lg border border-gray-700" 
+                        className="mt-2 max-w-full h-auto rounded-lg border border-gray-200" 
                       />
                     )}
                   </div>
                 ) : (
                   <div 
-                    className={`${message.isBot ? 'text-gray-100 text-sm' : 'text-white'} max-w-none`}
+                    className={`${message.isBot ? 'text-gray-700 text-sm' : 'text-white'} max-w-none`}
                     dangerouslySetInnerHTML={{ __html: message.text }} 
                   />
                 )}
                 
-                <div className="flex items-center justify-between mt-2">
-                  <span className="text-xs opacity-60">
+                <div className="flex items-center justify-between mt-1">
+                  <span className={`text-xs ${message.isBot ? 'text-gray-400' : 'text-blue-100'}`}>
                     {message.time}
                     {message.isBot && message.duration > 0 && (
                       <span> • {(message.duration / 1000).toFixed(1)}s</span>
@@ -530,7 +536,7 @@ const ChatBot = () => {
                   {message.isBot && (
                     <button
                       onClick={() => copyToClipboard(message.text.replace(/<[^>]*>?/gm, ''))}
-                      className="text-xs opacity-60 hover:opacity-100 transition-opacity ml-2"
+                      className="text-xs text-gray-400 hover:text-gray-600 transition-colors ml-2"
                       title="Copy to clipboard"
                     >
                       <FiCopy size={14} />
@@ -544,12 +550,12 @@ const ChatBot = () => {
         
         {isBotTyping && (
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3 }}
+            transition={{ duration: 0.2 }}
             className="flex justify-start"
           >
-            <div className="bg-gray-800/40 backdrop-blur-sm border border-gray-700 rounded-xl p-4 max-w-[80%]">
+            <div className="bg-white border border-gray-200 rounded-lg p-3 max-w-[80%]">
               <div className="flex items-center space-x-2">
                 <div className="flex space-x-1">
                   <motion.span
@@ -568,7 +574,7 @@ const ChatBot = () => {
                     transition={{ duration: 1.2, repeat: Infinity, delay: 0.6 }}
                   />
                 </div>
-                <span className="text-sm text-gray-300">
+                <span className="text-sm text-gray-500">
                   {isProMode ? 'Processing deeply (4x)...' : 'Thinking...'}
                 </span>
               </div>
@@ -579,13 +585,13 @@ const ChatBot = () => {
       </div>
 
       {/* Bottom Input Container */}
-      <div className="border-t border-gray-800 bg-gray-900/80 backdrop-blur-lg">
+      <div className="border-t border-gray-200 bg-white">
         {/* File Preview */}
         {pendingFiles.length > 0 && (
-          <div className="flex items-center space-x-2 p-3 border-b border-gray-800 overflow-x-auto scrollbar-thin">
+          <div className="flex items-center space-x-2 p-3 border-b border-gray-200 overflow-x-auto scrollbar-thin">
             {pendingFiles.map((file, index) => (
               <div key={index} className="relative flex-shrink-0">
-                <div className="w-16 h-16 flex items-center justify-center bg-gray-800 rounded-lg border border-gray-700 overflow-hidden">
+                <div className="w-16 h-16 flex items-center justify-center bg-gray-100 rounded-lg border border-gray-200 overflow-hidden">
                   {file.type.startsWith('image/') ? (
                     <img 
                       src={URL.createObjectURL(file)} 
@@ -594,8 +600,8 @@ const ChatBot = () => {
                     />
                   ) : (
                     <div className="p-2 text-center">
-                      <FiFile size={20} className="mx-auto text-gray-400" />
-                      <p className="text-xs mt-1 truncate w-14">{file.name.split('.')[0]}</p>
+                      <FiFile size={20} className="mx-auto text-gray-500" />
+                      <p className="text-xs mt-1 truncate w-14 text-gray-600">{file.name.split('.')[0]}</p>
                     </div>
                   )}
                 </div>
@@ -632,7 +638,7 @@ const ChatBot = () => {
                 }
               }}
               placeholder="Message Orion..."
-              className="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 pr-12 focus:outline-none focus:ring-2 focus:ring-blue-500/50 text-white resize-none overflow-hidden transition-all duration-200 hover:border-gray-600"
+              className="w-full bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 pr-12 focus:outline-none focus:ring-2 focus:ring-blue-500/50 text-gray-800 resize-none overflow-hidden transition-all duration-200 hover:border-gray-300"
               rows={1}
               style={{ minHeight: '44px', maxHeight: '150px' }}
             />
@@ -641,7 +647,7 @@ const ChatBot = () => {
               {inputMessage && (
                 <button
                   onClick={() => setInputMessage('')}
-                  className="p-1 text-gray-400 hover:text-white rounded-full transition-colors"
+                  className="p-1 text-gray-500 hover:text-gray-700 rounded-full transition-colors"
                 >
                   <FiX size={18} />
                 </button>
@@ -660,8 +666,8 @@ const ChatBot = () => {
                   onClick={() => handleSendMessage(inputMessage, pendingFiles)}
                   disabled={(!inputMessage.trim() && pendingFiles.length === 0) || isBotTyping}
                   className={`p-1.5 rounded-full transition-all ${inputMessage.trim() || pendingFiles.length > 0 ? 
-                    'bg-blue-500 hover:bg-blue-600 text-white' : 
-                    'text-gray-500 hover:text-gray-300'}`}
+                    'bg-blue-600 hover:bg-blue-700 text-white' : 
+                    'text-gray-400 hover:text-gray-500'}`}
                 >
                   <FiSend size={18} />
                 </button>
@@ -671,11 +677,11 @@ const ChatBot = () => {
         </div>
 
         {/* Input Footer */}
-        <div className="flex items-center justify-between p-2 bg-gray-800/50 border-t border-gray-800">
+        <div className="flex items-center justify-between p-2 bg-gray-50 border-t border-gray-200">
           <div className="flex items-center space-x-1">
             <button
               onClick={() => setShowFileOptions(!showFileOptions)}
-              className="p-2 text-gray-400 hover:text-white rounded-full transition-colors"
+              className="p-2 text-gray-500 hover:text-gray-700 rounded-full transition-colors"
             >
               <FiPlus size={18} />
             </button>
@@ -683,33 +689,33 @@ const ChatBot = () => {
             <div className="relative">
               <button
                 onClick={() => setShowMemoryPanel(!showMemoryPanel)}
-                className="p-2 text-gray-400 hover:text-white rounded-full transition-colors flex items-center"
+                className="p-2 text-gray-500 hover:text-gray-700 rounded-full transition-colors flex items-center"
               >
                 <FiClock size={18} />
                 {memories.length > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-blue-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">
+                  <span className="absolute -top-1 -right-1 bg-blue-600 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">
                     {memories.length > 99 ? '99+' : memories.length}
                   </span>
                 )}
               </button>
               
               {showMemoryPanel && (
-                <div className="absolute bottom-full mb-2 left-0 w-72 bg-gray-800/90 backdrop-blur-lg rounded-xl shadow-xl z-20 border border-gray-700 overflow-hidden">
-                  <div className="p-3 border-b border-gray-700 flex justify-between items-center">
-                    <h4 className="font-medium flex items-center">
+                <div className="absolute bottom-full mb-2 left-0 w-72 bg-white rounded-lg shadow-lg z-20 border border-gray-200 overflow-hidden">
+                  <div className="p-3 border-b border-gray-200 flex justify-between items-center">
+                    <h4 className="font-medium flex items-center text-gray-800">
                       <FiCpu className="mr-2" /> Memory Context
                     </h4>
                     <div className="flex items-center space-x-2">
                       <button 
                         onClick={saveToMemory}
                         disabled={messages.length === 0}
-                        className="text-xs bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded transition-colors disabled:opacity-50"
+                        className="text-xs bg-gray-100 hover:bg-gray-200 px-2 py-1 rounded transition-colors disabled:opacity-50 text-gray-700"
                       >
                         Remember
                       </button>
                       <button 
                         onClick={() => setShowMemoryPanel(false)}
-                        className="text-gray-400 hover:text-white p-1"
+                        className="text-gray-500 hover:text-gray-700 p-1"
                       >
                         <FiX size={16} />
                       </button>
@@ -718,23 +724,23 @@ const ChatBot = () => {
                   
                   <div className="max-h-64 overflow-y-auto scrollbar-thin">
                     {memories.length === 0 ? (
-                      <div className="p-4 text-center text-sm text-gray-400">
+                      <div className="p-4 text-center text-sm text-gray-500">
                         No memories yet. Important context will appear here.
                       </div>
                     ) : (
-                      <div className="divide-y divide-gray-700">
+                      <div className="divide-y divide-gray-200">
                         {memories.map((memory) => (
-                          <div key={memory.id} className="p-3 hover:bg-gray-700/50 transition-colors group">
+                          <div key={memory.id} className="p-3 hover:bg-gray-50 transition-colors group">
                             <div className="flex justify-between items-start">
-                              <p className="text-sm break-words pr-2">{memory.summary}</p>
+                              <p className="text-sm break-words pr-2 text-gray-700">{memory.summary}</p>
                               <button
                                 onClick={() => deleteMemory(memory.id)}
-                                className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-400 text-xs transition-opacity"
+                                className="opacity-0 group-hover:opacity-100 text-gray-500 hover:text-red-500 text-xs transition-opacity"
                               >
                                 <FiTrash2 size={14} />
                               </button>
                             </div>
-                            <p className="text-xs text-gray-500 mt-1">{memory.date}</p>
+                            <p className="text-xs text-gray-400 mt-1">{memory.date}</p>
                           </div>
                         ))}
                       </div>
@@ -748,7 +754,7 @@ const ChatBot = () => {
           <div className="flex items-center space-x-2">
             <button
               onClick={startNewConversation}
-              className="text-xs bg-gray-700 hover:bg-gray-600 px-3 py-1.5 rounded-lg transition-colors flex items-center"
+              className="text-xs bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-lg transition-colors flex items-center text-gray-700"
             >
               <span>New Chat</span>
             </button>
@@ -757,8 +763,8 @@ const ChatBot = () => {
         
         {/* File Options */}
         {showFileOptions && (
-          <div className="flex space-x-2 p-2 border-t border-gray-800 bg-gray-800/50">
-            <label className="cursor-pointer p-2 text-gray-400 hover:text-white rounded-full transition-colors">
+          <div className="flex space-x-2 p-2 border-t border-gray-200 bg-gray-50">
+            <label className="cursor-pointer p-2 text-gray-500 hover:text-gray-700 rounded-full transition-colors">
               <input
                 type="file"
                 accept="image/*"
@@ -767,7 +773,7 @@ const ChatBot = () => {
               />
               <FiImage size={18} />
             </label>
-            <label className="cursor-pointer p-2 text-gray-400 hover:text-white rounded-full transition-colors">
+            <label className="cursor-pointer p-2 text-gray-500 hover:text-gray-700 rounded-full transition-colors">
               <input
                 type="file"
                 className="hidden"
@@ -788,51 +794,53 @@ const ChatBot = () => {
           border-radius: 50%;
         }
         .code-container {
-          background: #1E1E1E;
-          border-radius: 8px;
-          margin: 1em 0;
+          background: #f8f9fa;
+          border-radius: 6px;
+          margin: 0.5em 0;
           overflow: hidden;
-          border: 1px solid #333;
+          border: 1px solid #e9ecef;
         }
         .code-toolbar {
           display: flex;
           justify-content: space-between;
           align-items: center;
-          padding: 0.5em 1em;
-          background: #252526;
-          color: #9CDCFE;
-          font-size: 0.8em;
+          padding: 0.4em 0.8em;
+          background: #e9ecef;
+          color: #495057;
+          font-size: 0.75em;
         }
         .language-tag {
-          background: #333;
-          padding: 0.2em 0.5em;
-          border-radius: 4px;
-          font-size: 0.8em;
+          background: #dee2e6;
+          padding: 0.15em 0.4em;
+          border-radius: 3px;
+          font-size: 0.75em;
+          font-family: monospace;
         }
         .copy-button {
           background: transparent;
-          border: 1px solid #555;
-          color: #D4D4D4;
+          border: 1px solid #adb5bd;
+          color: #495057;
           cursor: pointer;
-          padding: 0.2em 0.5em;
-          border-radius: 4px;
-          font-size: 0.8em;
+          padding: 0.15em 0.4em;
+          border-radius: 3px;
+          font-size: 0.75em;
           display: flex;
           align-items: center;
           gap: 0.3em;
+          font-family: -apple-system, BlinkMacSystemFont, sans-serif;
         }
         .copy-button:hover {
-          background: #333;
+          background: #dee2e6;
         }
         .code-block {
           margin: 0;
-          padding: 1em;
+          padding: 0.8em;
           overflow-x: auto;
           font-family: 'Fira Code', 'Courier New', monospace;
-          font-size: 0.9em;
+          font-size: 0.8em;
           line-height: 1.5;
-          color: #D4D4D4;
-          background: #1E1E1E;
+          color: #212529;
+          background: #f8f9fa;
         }
         .code-block code {
           font-family: inherit;
@@ -858,16 +866,19 @@ const ChatBot = () => {
         }
         .prose {
           max-width: 100%;
+          font-size: 0.875rem;
+          line-height: 1.5;
         }
         .prose code:not(.code-block code) {
-          background: rgba(110, 118, 129, 0.4);
-          padding: 0.2em 0.4em;
-          border-radius: 4px;
-          font-size: 0.9em;
+          background: #e9ecef;
+          padding: 0.15em 0.3em;
+          border-radius: 3px;
+          font-size: 0.85em;
+          font-family: 'Fira Code', monospace;
         }
         .prose strong {
           font-weight: 600;
-          color: #fff;
+          color: #212529;
         }
         .prose em {
           font-style: italic;
@@ -879,7 +890,7 @@ const ChatBot = () => {
           text-decoration: line-through;
         }
         .prose a {
-          color: #58a6ff;
+          color: #1a73e8;
           text-decoration: none;
         }
         .prose a:hover {
@@ -891,38 +902,39 @@ const ChatBot = () => {
         .prose img {
           max-width: 100%;
           height: auto;
-          border-radius: 6px;
+          border-radius: 4px;
         }
         .prose ul, .prose ol {
-          padding-left: 1.5em;
+          padding-left: 1.25em;
           margin: 0.5em 0;
         }
         .prose li {
           margin: 0.25em 0;
         }
         .prose blockquote {
-          border-left: 3px solid #3b82f6;
-          padding-left: 1em;
-          margin: 1em 0;
-          color: #d1d5db;
+          border-left: 2px solid #dee2e6;
+          padding-left: 0.8em;
+          margin: 0.8em 0;
+          color: #495057;
         }
         .prose table {
           border-collapse: collapse;
           width: 100%;
-          margin: 1em 0;
+          margin: 0.8em 0;
+          font-size: 0.85em;
         }
         .prose th, .prose td {
-          border: 1px solid #4b5563;
-          padding: 0.5em;
+          border: 1px solid #dee2e6;
+          padding: 0.4em 0.6em;
           text-align: left;
         }
         .prose th {
-          background-color: #1f2937;
+          background-color: #f1f3f5;
         }
         .prose hr {
           border: none;
-          border-top: 1px solid #4b5563;
-          margin: 1.5em 0;
+          border-top: 1px solid #dee2e6;
+          margin: 1em 0;
         }
       `}</style>
     </div>
