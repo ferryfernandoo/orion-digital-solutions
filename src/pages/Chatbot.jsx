@@ -3,9 +3,11 @@ import PropTypes from 'prop-types';
 import DOMPurify from 'dompurify';
 import { motion, AnimatePresence } from 'framer-motion';
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { FiCopy, FiSend, FiPlus, FiX, FiImage, FiFile, FiTrash2, FiClock, FiCpu, FiSettings, FiZap, FiStopCircle } from 'react-icons/fi';
+import { FiCopy, FiSend, FiPlus, FiX, FiImage, FiFile, FiTrash2, FiClock, FiCpu, FiSettings, FiZap, FiStopCircle, FiMessageSquare } from 'react-icons/fi';
 
 const ChatBot = () => {
+  const [chatRooms, setChatRooms] = useState([]);
+  const [currentRoomId, setCurrentRoomId] = useState(null);
   const [messages, setMessages] = useState([]);
   const [inputMessage, setInputMessage] = useState('');
   const [isBotTyping, setIsBotTyping] = useState(false);
@@ -17,6 +19,7 @@ const ChatBot = () => {
   const [memories, setMemories] = useState([]);
   const [isProMode, setIsProMode] = useState(false);
   const [abortController, setAbortController] = useState(null);
+  const [showChatHistory, setShowChatHistory] = useState(false);
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
   const chatContainerRef = useRef(null);
@@ -26,16 +29,91 @@ const ChatBot = () => {
   const genAI = new GoogleGenerativeAI("AIzaSyDSTgkkROL7mjaGKoD2vnc8l2UptNCbvHk");
   const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
-  // Load memories and chat history from localStorage
+  // Load data from localStorage
   useEffect(() => {
     const savedMemories = localStorage.getItem('orionMemories');
-    const savedChatHistory = localStorage.getItem('orionChatHistory');
+    const savedChatRooms = localStorage.getItem('orionChatRooms');
+    const savedCurrentRoom = localStorage.getItem('orionCurrentRoom');
     const savedProMode = localStorage.getItem('orionProMode');
     
     if (savedMemories) setMemories(JSON.parse(savedMemories));
-    if (savedChatHistory) setChatHistory(JSON.parse(savedChatHistory));
+    if (savedChatRooms) setChatRooms(JSON.parse(savedChatRooms));
+    if (savedCurrentRoom) {
+      setCurrentRoomId(savedCurrentRoom);
+      const room = JSON.parse(savedCurrentRoom);
+      if (room) {
+        setMessages(room.messages || []);
+        setChatHistory(room.history || []);
+      }
+    }
     if (savedProMode) setIsProMode(savedProMode === 'true');
+    
+    // Create initial room if none exists
+    if (!savedCurrentRoom && (!savedChatRooms || JSON.parse(savedChatRooms).length === 0)) {
+      createNewChatRoom();
+    }
   }, []);
+
+  // Save current room when messages change
+  useEffect(() => {
+    if (currentRoomId) {
+      const updatedRooms = chatRooms.map(room => 
+        room.id === currentRoomId 
+          ? { ...room, messages, history: chatHistory } 
+          : room
+      );
+      setChatRooms(updatedRooms);
+      localStorage.setItem('orionChatRooms', JSON.stringify(updatedRooms));
+      localStorage.setItem('orionCurrentRoom', JSON.stringify(currentRoomId));
+    }
+  }, [messages, chatHistory, currentRoomId]);
+
+  const createNewChatRoom = () => {
+    const newRoom = {
+      id: Date.now().toString(),
+      name: `Chat ${new Date().toLocaleTimeString()}`,
+      messages: [],
+      history: [],
+      createdAt: new Date().toISOString()
+    };
+    
+    setChatRooms(prev => [newRoom, ...prev]);
+    setCurrentRoomId(newRoom.id);
+    setMessages([]);
+    setChatHistory([]);
+    setPendingFiles([]);
+    setInputMessage('');
+    setShowTemplateButtons(true);
+    messageCountRef.current = 0;
+    
+    localStorage.setItem('orionChatRooms', JSON.stringify([newRoom, ...chatRooms]));
+    localStorage.setItem('orionCurrentRoom', JSON.stringify(newRoom.id));
+  };
+
+  const switchChatRoom = (roomId) => {
+    const room = chatRooms.find(r => r.id === roomId);
+    if (room) {
+      setCurrentRoomId(roomId);
+      setMessages(room.messages || []);
+      setChatHistory(room.history || []);
+      setShowTemplateButtons(room.messages.length === 0);
+      setShowChatHistory(false);
+    }
+  };
+
+  const deleteChatRoom = (roomId) => {
+    const updatedRooms = chatRooms.filter(room => room.id !== roomId);
+    setChatRooms(updatedRooms);
+    localStorage.setItem('orionChatRooms', JSON.stringify(updatedRooms));
+    
+    if (currentRoomId === roomId) {
+      if (updatedRooms.length > 0) {
+        switchChatRoom(updatedRooms[0].id);
+      } else {
+        createNewChatRoom();
+      }
+    }
+  };
 
   const scrollToBottom = useCallback((behavior = 'smooth') => {
     messagesEndRef.current?.scrollIntoView({ behavior, block: 'nearest' });
@@ -144,21 +222,41 @@ const ChatBot = () => {
     }
   };
 
-  const generateWithProMode = async (prompt) => {
-    const generationPromises = [];
+  const enhanceWithProMode = async (initialResponse, prompt) => {
+    const enhancementPrompts = [
+      `Expand this response significantly with detailed examples and explanations:\n\n${initialResponse}`,
+      `Add comprehensive technical details, use cases, and potential variations to:\n\n${initialResponse}`,
+      `Provide multiple perspectives, edge cases, and practical applications for:\n\n${initialResponse}`,
+      `Create an extremely detailed final version incorporating all previous enhancements for:\n\n${initialResponse}`
+    ];
     
-    for (let i = 0; i < 4; i++) {
-      generationPromises.push(
-        model.generateContent(prompt)
-          .then(result => result.response.text())
-          .catch(() => '')
-      );
+    let enhancedResponse = initialResponse;
+    
+    for (let i = 0; i < enhancementPrompts.length; i++) {
+      if (abortController?.signal.aborted) break;
+      
+      try {
+        const result = await model.generateContent(enhancementPrompts[i]);
+        const response = await result.response.text();
+        enhancedResponse = response;
+      } catch (error) {
+        console.error(`Error in enhancement step ${i + 1}:`, error);
+      }
+      
+      // Update progress in UI
+      setMessages(prev => prev.map(msg => 
+        msg.id === currentMessageId.current 
+          ? { ...msg, text: `${enhancedResponse}<br/><br/><em>Enhancing response (${i + 1}/4)...</em>` } 
+          : msg
+      ));
+      
+      await new Promise(resolve => setTimeout(resolve, 500));
     }
     
-    const responses = await Promise.all(generationPromises);
-    return responses.reduce((longest, current) => 
-      current.length > longest.length ? current : longest, "");
+    return enhancedResponse;
   };
+
+  const currentMessageId = useRef(null);
 
   const stopGeneration = () => {
     if (abortController) {
@@ -181,7 +279,6 @@ const ChatBot = () => {
       const userMessage = { role: 'user', content: trimmedMessage };
       const updatedHistory = [...chatHistory, userMessage];
       setChatHistory(updatedHistory);
-      localStorage.setItem('orionChatHistory', JSON.stringify(updatedHistory));
 
       if (trimmedMessage) {
         setMessages(prev => [...prev, createMessageObject(trimmedMessage, false)]);
@@ -229,9 +326,27 @@ const ChatBot = () => {
         isProMode ? ' Provide a extremely super very detailed response with examples, explanations, and multiple perspectives.' : ''
       }`;
 
+      // Create initial message object for bot response
+      const messageId = Date.now().toString();
+      currentMessageId.current = messageId;
+      
+      setMessages(prev => [...prev, {
+        id: messageId,
+        text: isProMode ? 'Processing with Pro Mode (this may take a moment)...' : '',
+        isBot: true,
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        duration: 0,
+        file: null
+      }]);
+
       let botResponse;
       if (isProMode) {
-        botResponse = await generateWithProMode(fullPrompt);
+        // Get initial response
+        const initialResult = await model.generateContent(fullPrompt);
+        const initialResponse = await initialResult.response.text();
+        
+        // Enhance with Pro Mode processing
+        botResponse = await enhanceWithProMode(initialResponse, fullPrompt);
       } else {
         const result = await model.generateContent(fullPrompt);
         botResponse = await result.response.text();
@@ -240,16 +355,12 @@ const ChatBot = () => {
       const processedResponse = processSpecialChars(botResponse);
       const duration = Date.now() - startTime;
 
-      // Create message object for bot response
-      const messageId = Date.now().toString();
-      setMessages(prev => [...prev, {
-        id: messageId,
-        text: isProMode ? processedResponse : '',
-        isBot: true,
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        duration,
-        file: null
-      }]);
+      // Update the message with final response
+      setMessages(prev => prev.map(msg => 
+        msg.id === messageId 
+          ? { ...msg, text: processedResponse, duration } 
+          : msg
+      ));
 
       // Type out the message with animation (only in normal mode)
       if (!isProMode) {
@@ -264,7 +375,6 @@ const ChatBot = () => {
       const botMessage = { role: 'assistant', content: botResponse };
       const newChatHistory = [...updatedHistory, botMessage];
       setChatHistory(newChatHistory);
-      localStorage.setItem('orionChatHistory', JSON.stringify(newChatHistory));
 
       // Auto-save to memory every 2 messages
       await autoSaveToMemory();
@@ -279,6 +389,7 @@ const ChatBot = () => {
       setIsBotTyping(false);
       clearTimeout(timeoutId);
       setAbortController(null);
+      currentMessageId.current = null;
     }
   };
 
@@ -336,19 +447,6 @@ const ChatBot = () => {
     }
   };
 
-  const startNewConversation = async () => {
-    if (messages.length > 0) {
-      await autoSaveToMemory();
-    }
-    setMessages([]);
-    setChatHistory([]);
-    setPendingFiles([]);
-    setInputMessage('');
-    setShowTemplateButtons(true);
-    messageCountRef.current = 0;
-    localStorage.removeItem('orionChatHistory');
-  };
-
   const deleteMemory = (id) => {
     const updatedMemories = memories.filter(memory => memory.id !== id);
     setMemories(updatedMemories);
@@ -366,6 +464,12 @@ const ChatBot = () => {
       {/* Header */}
       <div className="bg-white border-b border-gray-200 p-3 flex items-center justify-between sticky top-0 z-10 shadow-sm">
         <div className="flex items-center space-x-2">
+          <button 
+            onClick={() => setShowChatHistory(!showChatHistory)}
+            className="p-1.5 rounded-full hover:bg-gray-100 transition-colors"
+          >
+            <FiMessageSquare size={16} />
+          </button>
           <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow">
             <span className="text-white text-xs font-bold">AI</span>
           </div>
@@ -403,8 +507,77 @@ const ChatBot = () => {
           >
             <FiCpu size={16} />
           </button>
+          <button
+            onClick={createNewChatRoom}
+            className="p-1.5 rounded-full text-gray-500 hover:bg-gray-100 transition-colors"
+            title="New Chat"
+          >
+            <FiPlus size={16} />
+          </button>
         </div>
       </div>
+
+      {/* Chat History Panel */}
+      {showChatHistory && (
+        <motion.div 
+          initial={{ opacity: 0, x: -20 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: -20 }}
+          transition={{ type: "spring", damping: 25 }}
+          className="absolute left-3 top-14 bg-white rounded-xl shadow-xl z-20 border border-gray-200 w-72"
+        >
+          <div className="p-3 border-b border-gray-200 flex justify-between items-center">
+            <h4 className="font-medium text-sm">Chat History</h4>
+            <button 
+              onClick={() => setShowChatHistory(false)}
+              className="text-gray-500 hover:text-gray-700 p-1"
+            >
+              <FiX size={16} />
+            </button>
+          </div>
+          
+          <div className="max-h-96 overflow-y-auto scrollbar-thin text-sm">
+            {chatRooms.length === 0 ? (
+              <div className="p-4 text-center text-sm text-gray-500">
+                No chat history yet
+              </div>
+            ) : (
+              <div className="divide-y divide-gray-200">
+                {chatRooms.map((room) => (
+                  <div 
+                    key={room.id} 
+                    className={`p-3 hover:bg-gray-50 transition-colors cursor-pointer group ${room.id === currentRoomId ? 'bg-blue-50' : ''}`}
+                    onClick={() => switchChatRoom(room.id)}
+                  >
+                    <div className="flex justify-between items-start">
+                      <p className="text-xs font-medium break-words pr-2">
+                        {room.name}
+                      </p>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteChatRoom(room.id);
+                        }}
+                        className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 text-xs transition-opacity"
+                      >
+                        <FiTrash2 size={14} />
+                      </button>
+                    </div>
+                    <p className="text-xs text-gray-400 mt-1">
+                      {new Date(room.createdAt).toLocaleString()}
+                    </p>
+                    {room.messages.length > 0 && (
+                      <p className="text-xs text-gray-500 mt-1 truncate">
+                        {room.messages[room.messages.length - 1].text.replace(/<[^>]*>?/gm, '').substring(0, 50)}...
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </motion.div>
+      )}
 
       {/* Chat Area */}
       <div 
@@ -483,7 +656,7 @@ const ChatBot = () => {
                 
                 {message.file ? (
                   <div>
-                    <p className={`text-xs mb-1 ${message.isBot ? 'text-gray-500' : 'text-blue-100'}`}>File: {message.file.name}</p>
+                    <p className={`text-xs mb-1 ${message.isBot ? 'text-gray-500' : 'text-blue-100'}`}>File: ${message.file.name}</p>
                     {message.file.type.startsWith('image/') && (
                       <img 
                         src={URL.createObjectURL(message.file)} 
@@ -551,6 +724,13 @@ const ChatBot = () => {
                 <span className="text-sm text-gray-500">
                   {isProMode ? 'Processing deeply...' : 'Thinking...'}
                 </span>
+                <button
+                  onClick={stopGeneration}
+                  className="ml-2 text-xs bg-red-500 hover:bg-red-600 text-white px-2 py-0.5 rounded-full transition-colors flex items-center"
+                >
+                  <FiStopCircle size={12} className="mr-1" />
+                  Stop
+                </button>
               </div>
             </div>
           </motion.div>
@@ -684,13 +864,15 @@ const ChatBot = () => {
             )}
             
             {isBotTyping ? (
-              <button
+              <motion.button
                 onClick={stopGeneration}
                 className="p-1.5 rounded-full bg-red-500 hover:bg-red-600 text-white transition-colors shadow"
                 title="Stop generation"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
               >
                 <FiStopCircle size={16} />
-              </button>
+              </motion.button>
             ) : (
               <>
                 <button
@@ -699,15 +881,20 @@ const ChatBot = () => {
                 >
                   <FiPlus size={16} />
                 </button>
-                <button
+                <motion.button
                   onClick={() => handleSendMessage(inputMessage, pendingFiles)}
                   disabled={(!inputMessage.trim() && pendingFiles.length === 0) || isBotTyping}
                   className={`p-1.5 rounded-full transition-all ${inputMessage.trim() || pendingFiles.length > 0 ? 
                     'bg-gradient-to-br from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white shadow' : 
                     'text-gray-400 hover:text-gray-500 hover:bg-gray-100'}`}
+                  whileHover={{ 
+                    scale: inputMessage.trim() || pendingFiles.length > 0 ? 1.05 : 1,
+                    rotate: inputMessage.trim() || pendingFiles.length > 0 ? 5 : 0
+                  }}
+                  whileTap={{ scale: 0.95 }}
                 >
                   <FiSend size={16} />
-                </button>
+                </motion.button>
               </>
             )}
           </div>
@@ -722,7 +909,11 @@ const ChatBot = () => {
             transition={{ duration: 0.2 }}
             className="flex space-x-2 pt-2"
           >
-            <label className="cursor-pointer p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
+            <motion.label 
+              className="cursor-pointer p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
               <input
                 type="file"
                 accept="image/*"
@@ -730,15 +921,19 @@ const ChatBot = () => {
                 onChange={handleFileUpload}
               />
               <FiImage size={18} />
-            </label>
-            <label className="cursor-pointer p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors">
+            </motion.label>
+            <motion.label 
+              className="cursor-pointer p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
               <input
                 type="file"
                 className="hidden"
                 onChange={handleFileUpload}
               />
               <FiFile size={18} />
-            </label>
+            </motion.label>
           </motion.div>
         )}
       </div>
