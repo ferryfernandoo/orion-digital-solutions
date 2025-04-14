@@ -3,9 +3,7 @@ import PropTypes from 'prop-types';
 import DOMPurify from 'dompurify';
 import { motion, AnimatePresence } from 'framer-motion';
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { FiCopy, FiSend, FiPlus, FiX, FiImage, FiFile, FiTrash2, FiClock, FiCpu, FiSettings, FiZap, FiStopCircle, FiMessageSquare, FiMic } from 'react-icons/fi';
-import { TbRobot } from 'react-icons/tb';
-import { BsStars } from 'react-icons/bs';
+import { FiCopy, FiSend, FiPlus, FiX, FiImage, FiFile, FiTrash2, FiClock, FiCpu, FiSettings, FiZap, FiStopCircle, FiMessageSquare } from 'react-icons/fi';
 
 const ChatBot = () => {
   const [chatRooms, setChatRooms] = useState([]);
@@ -22,7 +20,6 @@ const ChatBot = () => {
   const [isProMode, setIsProMode] = useState(false);
   const [abortController, setAbortController] = useState(null);
   const [showChatHistory, setShowChatHistory] = useState(false);
-  const [isListening, setIsListening] = useState(false);
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
   const chatContainerRef = useRef(null);
@@ -30,7 +27,7 @@ const ChatBot = () => {
 
   // Initialize Google Generative AI
   const genAI = new GoogleGenerativeAI("AIzaSyDSTgkkROL7mjaGKoD2vnc8l2UptNCbvHk");
-  const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+  const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
   // Load data from localStorage
   useEffect(() => {
@@ -202,23 +199,26 @@ const ChatBot = () => {
       return;
     }
     
-    // Split text into chunks for smoother animation
-    const sentences = fullText.split(/(?<=[.!?])\s+/);
+    // Split text into chunks of 5 words for smoother animation
+    const words = fullText.split(' ');
     let displayedText = '';
     
-    for (let i = 0; i < sentences.length; i++) {
+    for (let i = 0; i < words.length; i++) {
       if (abortController?.signal.aborted) break;
       
-      displayedText += (i === 0 ? '' : ' ') + sentences[i];
+      // Add next 5 words
+      const chunk = words.slice(i, i + 5).join(' ');
+      displayedText += (i === 0 ? '' : ' ') + chunk;
       callback(displayedText);
+      i += 4; // Skip next 4 as we've added 5 words
       
       // Smooth scrolling during typing
       const isNearBottom = chatContainerRef.current.scrollHeight - chatContainerRef.current.scrollTop - chatContainerRef.current.clientHeight < 100;
       if (isNearBottom) {
-        scrollToBottom('auto');
+        scrollToBottom('smooth');
       }
       
-      await new Promise(resolve => setTimeout(resolve, 50));
+      await new Promise(resolve => setTimeout(resolve, 100));
     }
   };
 
@@ -266,84 +266,6 @@ const ChatBot = () => {
     setIsBotTyping(false);
   };
 
-  const toggleVoiceInput = () => {
-    if (!isListening) {
-      // Start voice recognition
-      const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
-      recognition.lang = 'id-ID';
-      recognition.interimResults = false;
-      
-      recognition.onstart = () => {
-        setIsListening(true);
-        setInputMessage(prev => prev + ' 🎤 Listening...');
-      };
-      
-      recognition.onresult = (event) => {
-        const transcript = event.results[0][0].transcript;
-        setInputMessage(prev => prev.replace(' 🎤 Listening...', '') + transcript);
-        setIsListening(false);
-      };
-      
-      recognition.onerror = (event) => {
-        console.error('Speech recognition error', event.error);
-        setInputMessage(prev => prev.replace(' 🎤 Listening...', ''));
-        setIsListening(false);
-      };
-      
-      recognition.start();
-    } else {
-      // Stop voice recognition
-      const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
-      recognition.stop();
-      setIsListening(false);
-      setInputMessage(prev => prev.replace(' 🎤 Listening...', ''));
-    }
-  };
-
-  const extractTextFromFile = async (file) => {
-    try {
-      if (file.type.startsWith('image/')) {
-        // OCR for images
-        const formData = new FormData();
-        formData.append('file', file);
-        
-        const response = await fetch('https://api.ocr.space/parse/image', {
-          method: 'POST',
-          headers: {
-            'apikey': 'K88956188988957' // Free OCR API key
-          },
-          body: formData
-        });
-        
-        const data = await response.json();
-        return data.ParsedResults?.[0]?.ParsedText || "Couldn't extract text from image";
-      } else if (file.type === 'application/pdf') {
-        // PDF text extraction
-        const pdfjs = await import('pdfjs-dist/build/pdf');
-        const pdfjsWorker = await import('pdfjs-dist/build/pdf.worker.entry');
-        pdfjs.GlobalWorkerOptions.workerSrc = pdfjsWorker;
-        
-        const arrayBuffer = await file.arrayBuffer();
-        const pdf = await pdfjs.getDocument(arrayBuffer).promise;
-        let fullText = '';
-        
-        for (let i = 1; i <= pdf.numPages; i++) {
-          const page = await pdf.getPage(i);
-          const textContent = await page.getTextContent();
-          const strings = textContent.items.map(item => item.str);
-          fullText += strings.join(' ') + '\n';
-        }
-        
-        return fullText || "Couldn't extract text from PDF";
-      }
-      
-      return "File type not supported for text extraction";
-    } catch (error) {
-      console.error("Error extracting text:", error);
-      return "Error extracting text from file";
-    }
-  };
-
   const handleSendMessage = async (messageText, files = []) => {
     const trimmedMessage = messageText.trim();
     if ((!trimmedMessage && files.length === 0) || isBotTyping) return;
@@ -362,16 +284,10 @@ const ChatBot = () => {
         setMessages(prev => [...prev, createMessageObject(trimmedMessage, false)]);
       }
 
-      // Process files if any
-      let fileContents = '';
       if (files.length > 0) {
-        for (const file of files) {
+        files.forEach(file => {
           setMessages(prev => [...prev, createMessageObject(`File: ${file.name}`, false, 0, file)]);
-          
-          // Extract text from files
-          const extractedText = await extractTextFromFile(file);
-          fileContents += `\n\n[File Content: ${file.name}]\n${extractedText}`;
-        }
+        });
       }
 
       setInputMessage('');
@@ -401,12 +317,13 @@ const ChatBot = () => {
 
       const fullPrompt = `${
         relevantMemories ? `Konteks Memori Relevan:\n${relevantMemories}\n\n` : ''
-      }Percakapan Saat Ini:\n${contextMessages}\n\nUser: "${trimmedMessage}"${
-        fileContents ? `\n\nUser juga mengirim file dengan konten:${fileContents}` : ''
-      }\n\nRespond as Orion in natural language and follow user language. Be ${
-        isProMode ? 'extremely detailed and comprehensive (4x processing)' : 'concise but extremely helpful'
+      }Percakapan Saat Ini:\n${contextMessages}\n\nUser: "${trimmedMessage}". 
+      Respond as Orion in natural language and follow user language and extremely friendly and very human little bit emoticon and get straight to the point.S,
+      focuse to user comfort. Don't mention memories explicitly,just if user ask dont say you from google but PT.Orion Digital Platforms from indonesia dont show thos too usualy just if user asked,
+      just incorporate relevant context naturally, it all is back process dont show in chat. Be ${
+        isProMode ? 'extremely detailed and comprehensive (4x processing)Give user the longest most detailed answer you possibly can' : 'concise but extremely helpful'
       }. For coding, provide complete solutions with proper formatting. Always maintain context.${
-        isProMode ? ' Provide a extremely detailed response with examples, explanations, and multiple perspectives.' : ''
+        isProMode ? ' Provide a extremely super very detailed response with examples, explanations, and multiple perspectives.' : ''
       }`;
 
       // Create initial message object for bot response
@@ -542,14 +459,6 @@ const ChatBot = () => {
     localStorage.setItem('orionProMode', newProMode.toString());
   };
 
-  const speakText = (text) => {
-    const utterance = new SpeechSynthesisUtterance(text.replace(/<[^>]*>?/gm, ''));
-    utterance.lang = 'id-ID';
-    utterance.rate = 1;
-    utterance.pitch = 1;
-    window.speechSynthesis.speak(utterance);
-  };
-
   return (
     <div className="flex flex-col h-screen bg-gray-50 text-gray-900 relative overflow-hidden">
       {/* Header */}
@@ -562,7 +471,7 @@ const ChatBot = () => {
             <FiMessageSquare size={16} />
           </button>
           <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow">
-            <TbRobot className="text-white text-sm" />
+            <span className="text-white text-xs font-bold">AI</span>
           </div>
           <div>
             <h2 className="font-semibold text-sm">Orion AI</h2>
@@ -589,7 +498,7 @@ const ChatBot = () => {
             className={`p-1.5 rounded-full transition-colors ${isProMode ? 'bg-blue-100 text-blue-600' : 'text-gray-500 hover:bg-gray-100'}`}
             title={isProMode ? 'Disable Pro Mode' : 'Enable Pro Mode'}
           >
-            <BsStars size={16} className={isProMode ? "text-yellow-500" : ""} />
+            <FiZap size={16} className={isProMode ? "text-yellow-500" : ""} />
           </button>
           <button 
             onClick={() => setShowMemoryPanel(!showMemoryPanel)}
@@ -678,7 +587,7 @@ const ChatBot = () => {
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full pb-16">
             <div className="w-16 h-16 mb-4 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg">
-              <TbRobot className="text-2xl text-white" />
+              <span className="text-2xl text-white">AI</span>
             </div>
             <h3 className="text-xl font-semibold text-center mb-1">
               Hello, I'm Orion!
@@ -732,89 +641,56 @@ const ChatBot = () => {
               transition={{ duration: 0.2, ease: "easeOut" }}
               className={`flex ${message.isBot ? 'justify-start' : 'justify-end'}`}
             >
-              {message.isBot ? (
-                <div className="max-w-[90%] md:max-w-[80%] w-full">
-                  <div className="bg-white border border-gray-200 rounded-2xl p-4 shadow-xs">
-                    <div className="flex items-center mb-2">
-                      <div className="w-5 h-5 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center mr-2 shadow">
-                        <TbRobot className="text-xs text-white" />
-                      </div>
-                      <span className="text-xs font-medium text-gray-500">Orion</span>
+              <div className={`max-w-[90%] md:max-w-[80%] ${message.isBot ? 
+                'bg-white border border-gray-200' : 
+                'bg-gradient-to-br from-blue-600 to-blue-500 text-white'} rounded-2xl p-3 shadow-xs`}
+              >
+                {message.isBot && (
+                  <div className="flex items-center mb-1">
+                    <div className="w-5 h-5 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center mr-2 shadow">
+                      <span className="text-2xs text-white">AI</span>
                     </div>
-                    
-                    {message.file ? (
-                      <div>
-                        <p className="text-xs mb-1 text-gray-500">File: {message.file.name}</p>
-                        {message.file.type.startsWith('image/') && (
-                          <img 
-                            src={URL.createObjectURL(message.file)} 
-                            alt="Uploaded" 
-                            className="mt-1 max-w-full h-auto rounded-lg border border-gray-200 shadow-sm" 
-                          />
-                        )}
-                      </div>
-                    ) : (
-                      <div 
-                        className="text-sm text-gray-700 prose"
-                        dangerouslySetInnerHTML={{ __html: message.text }} 
+                    <span className="text-xs font-medium text-gray-500">Orion</span>
+                  </div>
+                )}
+                
+                {message.file ? (
+                  <div>
+                    <p className={`text-xs mb-1 ${message.isBot ? 'text-gray-500' : 'text-blue-100'}`}>File: ${message.file.name}</p>
+                    {message.file.type.startsWith('image/') && (
+                      <img 
+                        src={URL.createObjectURL(message.file)} 
+                        alt="Uploaded" 
+                        className="mt-1 max-w-full h-auto rounded-lg border border-gray-200 shadow-sm" 
                       />
                     )}
-                    
-                    <div className="flex items-center justify-between mt-2">
-                      <span className="text-xs text-gray-400">
-                        {message.time}
-                        {message.isBot && message.duration > 0 && (
-                          <span> • {(message.duration / 1000).toFixed(1)}s</span>
-                        )}
-                      </span>
-                      
-                      <div className="flex space-x-2">
-                        <button
-                          onClick={() => speakText(message.text)}
-                          className="text-xs opacity-60 hover:opacity-100 transition-opacity text-gray-500 hover:text-gray-700"
-                          title="Read aloud"
-                        >
-                          <FiMic size={14} />
-                        </button>
-                        <button
-                          onClick={() => copyToClipboard(message.text.replace(/<[^>]*>?/gm, ''))}
-                          className="text-xs opacity-60 hover:opacity-100 transition-opacity text-gray-500 hover:text-gray-700"
-                          title="Copy to clipboard"
-                        >
-                          <FiCopy size={14} />
-                        </button>
-                      </div>
-                    </div>
                   </div>
-                </div>
-              ) : (
-                <div className="max-w-[90%] md:max-w-[80%] w-full">
-                  <div className="bg-gradient-to-br from-blue-600 to-blue-500 text-white rounded-2xl p-4">
-                    {message.file ? (
-                      <div>
-                        <p className="text-xs mb-1 text-blue-100">File: {message.file.name}</p>
-                        {message.file.type.startsWith('image/') && (
-                          <img 
-                            src={URL.createObjectURL(message.file)} 
-                            alt="Uploaded" 
-                            className="mt-1 max-w-full h-auto rounded-lg border border-blue-300 shadow-sm" 
-                          />
-                        )}
-                      </div>
-                    ) : (
-                      <div className="text-sm">
-                        {message.text}
-                      </div>
+                ) : (
+                  <div 
+                    className={`text-sm ${message.isBot ? 'text-gray-700' : 'text-white'}`}
+                    dangerouslySetInnerHTML={{ __html: message.text }} 
+                  />
+                )}
+                
+                <div className="flex items-center justify-between mt-1">
+                  <span className={`text-xs ${message.isBot ? 'text-gray-400' : 'text-blue-100'}`}>
+                    {message.time}
+                    {message.isBot && message.duration > 0 && (
+                      <span> • {(message.duration / 1000).toFixed(1)}s</span>
                     )}
-                    
-                    <div className="flex justify-end mt-2">
-                      <span className="text-xs text-blue-100">
-                        {message.time}
-                      </span>
-                    </div>
-                  </div>
+                  </span>
+                  
+                  {message.isBot && (
+                    <button
+                      onClick={() => copyToClipboard(message.text.replace(/<[^>]*>?/gm, ''))}
+                      className="text-xs opacity-60 hover:opacity-100 transition-opacity ml-2 text-gray-500 hover:text-gray-700"
+                      title="Copy to clipboard"
+                    >
+                      <FiCopy size={14} />
+                    </button>
+                  )}
                 </div>
-              )}
+              </div>
             </motion.div>
           ))}
         </AnimatePresence>
@@ -826,7 +702,7 @@ const ChatBot = () => {
             transition={{ duration: 0.2, ease: "easeOut" }}
             className="flex justify-start"
           >
-            <div className="bg-white border border-gray-200 rounded-2xl p-4 max-w-[80%] shadow-xs">
+            <div className="bg-white border border-gray-200 rounded-2xl p-3 max-w-[80%] shadow-xs">
               <div className="flex items-center space-x-2">
                 <div className="flex space-x-1">
                   <motion.span
@@ -987,14 +863,6 @@ const ChatBot = () => {
               </button>
             )}
             
-            <button
-              onClick={toggleVoiceInput}
-              className={`p-1.5 rounded-full transition-colors ${isListening ? 'bg-red-500 text-white' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'}`}
-              title="Voice input"
-            >
-              <FiMic size={16} />
-            </button>
-            
             {isBotTyping ? (
               <motion.button
                 onClick={stopGeneration}
@@ -1061,7 +929,6 @@ const ChatBot = () => {
             >
               <input
                 type="file"
-                accept=".pdf,.txt,.doc,.docx"
                 className="hidden"
                 onChange={handleFileUpload}
               />
