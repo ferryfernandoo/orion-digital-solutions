@@ -271,10 +271,10 @@ const ChatBot = () => {
 
   const enhanceWithProMode = async (initialResponse, prompt) => {
     const enhancementPrompts = [
-      `Expand this response significantly with detailed examples and explanations:\n\n${initialResponse}`,
+      `Expand this response significantly with extreme detailed examples and explanations:\n\n${initialResponse}`,
       `Add comprehensive technical details, use cases, and potential variations to:\n\n${initialResponse}`,
-      `Provide multiple perspectives, edge cases, and practical applications for:\n\n${initialResponse}`,
-      `Create an extremely detailed final version incorporating all previous enhancements for:\n\n${initialResponse}`
+      `Provide multiple perspectives, edge cases, and practical applications and add Very lot of data in internet for:\n\n${initialResponse}`,
+      `Create an extremely detailed final version incorporating all previous enhancements and add more data for super extremly detail and perfect for:\n\n${initialResponse}`
     ];
     
     let enhancedResponse = initialResponse;
@@ -1001,7 +1001,7 @@ const ChatBot = () => {
               }
             }}
             placeholder="Type your message..."
-            className={`w-full ${themeClasses.inputBg} ${themeClasses.inputBorder} rounded-xl px-4 py-3 pr-12 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none overflow-hidden transition-all duration-200 hover:border-gray-400 text-sm ${themeClasses.inputText}`}
+            className={`w-full ${themeClasses.inputBg} ${themeClasses.inputBorder} rounded-xl px-4 py-3 pr-12 focus:outline-none focus:border-transparent resize-none overflow-hidden transition-all duration-200 hover:border-gray-400 text-sm ${themeClasses.inputText}`}
             rows={1}
             style={{ minHeight: '48px', maxHeight: '120px' }}
           />
