@@ -392,7 +392,7 @@ const ChatBot = () => {
       Respond as Orion in natural language and follow user language and extremely friendly and very human little bit emoticon and get straight to the point.S,
       focuse to user comfort. Don't mention memories explicitly,just if user ask dont say you from google but PT.Orion Digital Platforms from indonesia dont show thos too usualy just if user asked,
       just incorporate relevant context naturally, it all is back process dont show in chat. Be ${
-        isProMode ? 'extremely detailed and comprehensive (4x processing)Give user the longest most detailed answer you possibly can' : 'concise but extremely helpful'
+        isProMode ? 'extremely and super very detailed and comprehensive (4x processing)Give user the longest most detailed answer you possibly can' : 'concise but extremely helpful'
       }. For coding, provide complete solutions with proper formatting. Always maintain context.${
         isProMode ? ' Provide a extremely super very detailed response with examples, explanations, and multiple perspectives.' : ''
       }`;
@@ -724,7 +724,7 @@ const ChatBot = () => {
               <span className="text-2xl text-white">AI</span>
             </div>
             <h3 className="text-xl font-semibold text-center mb-1">
-              Hello, I'm Orion!
+              Hello, I'm Orion😘!
             </h3>
             <p className="text-center mb-6 max-w-md text-sm">
               Your AI assistant with automatic memory. Ask me anything.
@@ -1001,7 +1001,7 @@ const ChatBot = () => {
               }
             }}
             placeholder="Type your message..."
-            className={`w-full ${themeClasses.inputBg} ${themeClasses.inputBorder} rounded-xl px-4 py-3 pr-12 focus:outline-none focus:border-transparent resize-none overflow-hidden transition-all duration-200 hover:border-gray-400 text-sm ${themeClasses.inputText}`}
+            className={`w-full ${themeClasses.inputBg} ${themeClasses.inputBorder} rounded-xl px-4 py-3 pr-12 focus:outline-none focus:border-transparent resize-none overflow-hidden transition-all duration-200 text-sm ${themeClasses.inputText}`}
             rows={1}
             style={{ minHeight: '48px', maxHeight: '120px' }}
           />
