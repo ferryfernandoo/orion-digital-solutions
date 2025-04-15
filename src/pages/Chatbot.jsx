@@ -1172,6 +1172,7 @@ const ChatBot = () => {
         .code-block {
           margin: 0;
           padding: 1em;
+          color: black;
           overflow-x: auto;
           font-family: 'Fira Code', 'JetBrains Mono', 'Courier New', monospace;
           font-size: 0.9em;
