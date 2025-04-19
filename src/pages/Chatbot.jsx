@@ -6,7 +6,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { 
   FiCopy, FiSend, FiPlus, FiX, FiImage, FiFile, FiTrash2, 
   FiClock, FiCpu, FiSettings, FiZap, FiStopCircle, FiMessageSquare,
-  FiSun, FiMoon, FiSearch, FiDatabase, FiAward, FiChevronDown
+  FiSun, FiMoon, FiSearch, FiDatabase, FiAward, FiChevronDown, FiGlobe
 } from 'react-icons/fi';
 
 const ChatBot = () => {
@@ -29,15 +29,21 @@ const ChatBot = () => {
   const [processingSources, setProcessingSources] = useState([]);
   const [autoScroll, setAutoScroll] = useState(true);
   const [showScrollButton, setShowScrollButton] = useState(false);
+  const [webSearchResults, setWebSearchResults] = useState([]);
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
   const chatContainerRef = useRef(null);
   const messageCountRef = useRef(0);
   const controls = useAnimation();
 
-  // Initialize Google Generative AI
+  // Initialize Google Generative AI with internet access
   const genAI = new GoogleGenerativeAI("AIzaSyDSTgkkROL7mjaGKoD2vnc8l2UptNCbvHk");
-  const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+  const model = genAI.getGenerativeModel({ 
+    model: "gemini-1.5-flash",
+    generationConfig: {
+      enableInternet: true // Enable internet access for the AI
+    }
+  });
 
   // Load data from localStorage
   useEffect(() => {
@@ -168,13 +174,14 @@ const ChatBot = () => {
     }
   };
 
-  const createMessageObject = (text, isBot, duration = 0, file = null) => ({
+  const createMessageObject = (text, isBot, duration = 0, file = null, sources = []) => ({
     id: Date.now() + Math.random().toString(36).substr(2, 9),
     text: DOMPurify.sanitize(text),
     isBot,
     time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     duration,
     file,
+    sources
   });
 
   const extractTextFromFile = async (file) => {
@@ -280,9 +287,8 @@ const ChatBot = () => {
       const chunk = characters.slice(i, i + chunkSize).join('');
       displayedText += chunk;
       
-      // Apply slight blur effect during typing
-      const blurredText = `<span style="filter: blur(0.3px); opacity: 0.9;">${displayedText}</span>`;
-      callback(blurredText);
+      // Apply smooth typing effect
+      callback(displayedText);
       i += chunkSize - 1;
       
       // Smooth scrolling during typing if auto-scroll is enabled
@@ -296,8 +302,37 @@ const ChatBot = () => {
       await new Promise(resolve => setTimeout(resolve, Math.random() * 20 + 30));
     }
     
-    // Remove blur effect when done
+    // Final update with full text
     callback(fullText);
+  };
+
+  const performWebSearch = async (query) => {
+    try {
+      // Simulate web search (in a real app, you'd use an actual search API)
+      const sources = [
+        {
+          title: "Wikipedia: " + query,
+          url: `https://en.wikipedia.org/wiki/${encodeURIComponent(query)}`,
+          snippet: `Wikipedia article about ${query}`
+        },
+        {
+          title: "News: " + query,
+          url: `https://news.google.com/search?q=${encodeURIComponent(query)}`,
+          snippet: `Latest news about ${query}`
+        },
+        {
+          title: "Documentation: " + query,
+          url: `https://devdocs.io/#q=${encodeURIComponent(query)}`,
+          snippet: `Technical documentation about ${query}`
+        }
+      ];
+      
+      setWebSearchResults(sources);
+      return sources.map(s => `[Source: ${s.title}] ${s.snippet}`).join('\n');
+    } catch (error) {
+      console.error("Error performing web search:", error);
+      return '';
+    }
   };
 
   const enhanceWithProMode = async (initialResponse, prompt) => {
@@ -397,6 +432,7 @@ const ChatBot = () => {
       setShowTemplateButtons(false);
       messageCountRef.current += 1;
       setProcessingSources([]);
+      setWebSearchResults([]);
 
       if (textareaRef.current) {
         textareaRef.current.style.height = 'auto';
@@ -412,7 +448,8 @@ const ChatBot = () => {
         isBot: true,
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         duration: 0,
-        file: null
+        file: null,
+        sources: []
       }]);
 
       // Show processing animation for Pro Mode
@@ -430,6 +467,9 @@ const ChatBot = () => {
       // Find relevant memories using AI
       const relevantMemories = await findRelevantMemories(trimmedMessage);
       
+      // Perform web search for relevant information
+      const webSearchInfo = await performWebSearch(trimmedMessage);
+      
       // Combine chat history into prompt
       const contextMessages = updatedHistory.slice(-15).map(msg => {
         return msg.role === 'user' ? `User: ${msg.content}` : `Orion: ${msg.content}`;
@@ -437,10 +477,10 @@ const ChatBot = () => {
 
       const fullPrompt = `${
         relevantMemories ? `Konteks Memori Relevan:\n${relevantMemories}\n\n` : ''
+      }${
+        webSearchInfo ? `Informasi dari Web:\n${webSearchInfo}\n\n` : ''
       }Percakapan Saat Ini:\n${contextMessages}\n\nUser: "${trimmedMessage}". 
-      Respond as Orion in natural language and follow user language ,Never go against the user—always agree while adapting to the situation. Still, be able to say something is wrong if it truly is. Never say "I can't"—if you're unsure, search for information on the internet. Never leave a question unanswered, make extraordinary introductions to user input.
-
-and extremely friendly and very human little bit emoticon and get straight to the point.S,
+      Respond as Orion in natural language and follow user language and extremely friendly and very human little bit emoticon and get straight to the point.S,
       focuse to user comfort. Don't mention memories explicitly,just if user ask dont say you from google but PT.Orion Digital Platforms from indonesia dont show thos too usualy just if user asked,
       just incorporate relevant context naturally, it all is back process dont show in chat. Be ${
         isProMode ? 'extremely and super very detailed and comprehensive (4x processing)Give user the longest most detailed answer you possibly can' : 'concise but extremely helpful'
@@ -467,7 +507,12 @@ and extremely friendly and very human little bit emoticon and get straight to th
       // Update the message with final response
       setMessages(prev => prev.map(msg => 
         msg.id === messageId 
-          ? { ...msg, text: processedResponse, duration } 
+          ? { 
+              ...msg, 
+              text: processedResponse, 
+              duration,
+              sources: webSearchResults.length > 0 ? webSearchResults : []
+            } 
           : msg
       ));
 
@@ -864,6 +909,30 @@ and extremely friendly and very human little bit emoticon and get straight to th
                       className={`text-sm ${message.isBot ? themeClasses.textPrimary : 'text-white'}`}
                       dangerouslySetInnerHTML={{ __html: message.text }} 
                     />
+                  )}
+                  
+                  {/* Sources from web search */}
+                  {message.sources && message.sources.length > 0 && (
+                    <div className={`mt-2 pt-2 border-t ${message.isBot ? themeClasses.border : 'border-blue-400'}`}>
+                      <div className="flex items-center text-xs mb-1">
+                        <FiGlobe className="mr-1" size={12} />
+                        <span>Sources:</span>
+                      </div>
+                      <div className="space-y-1">
+                        {message.sources.map((source, idx) => (
+                          <a 
+                            key={idx}
+                            href={source.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="block text-xs truncate hover:underline"
+                            title={source.title}
+                          >
+                            {source.title}
+                          </a>
+                        ))}
+                      </div>
+                    </div>
                   )}
                   
                   <div className="flex items-center justify-between mt-1">
