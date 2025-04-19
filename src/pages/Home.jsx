@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 
@@ -80,10 +80,40 @@ const fadeInVariants = {
   },
 };
 
+const floatingVariants = {
+  float: {
+    y: [0, -15, 0],
+    transition: {
+      duration: 6,
+      repeat: Infinity,
+      ease: "easeInOut",
+    },
+  },
+  floatDelay: {
+    y: [0, -20, 0],
+    transition: {
+      duration: 7,
+      delay: 1,
+      repeat: Infinity,
+      ease: "easeInOut",
+    },
+  },
+  floatDelay2: {
+    y: [0, -25, 0],
+    transition: {
+      duration: 8,
+      delay: 2,
+      repeat: Infinity,
+      ease: "easeInOut",
+    },
+  },
+};
+
 const Home = () => {
   const navigate = useNavigate();
 
-  const roles = [
+  // Memoize static data to prevent unnecessary re-renders
+  const roles = useMemo(() => [
     { 
       role: "Frontend Engineer", 
       description: "Craft intuitive interfaces with cutting-edge frameworks",
@@ -138,9 +168,9 @@ const Home = () => {
         </svg>
       )
     },
-  ];
+  ], []);
 
-  const valuePropositions = [
+  const valuePropositions = useMemo(() => [
     {
       title: "Enterprise AI Solutions",
       description: "We deliver transformative AI systems that drive operational efficiency, reduce costs, and create competitive advantages for global enterprises.",
@@ -168,29 +198,54 @@ const Home = () => {
         </svg>
       )
     },
-  ];
+  ], []);
+
+  // Generate optimized particles with useMemo
+  const particles = useMemo(() => 
+    Array.from({ length: 20 }).map((_, i) => ({
+      id: i,
+      x: Math.random() * 100,
+      y: Math.random() * 100,
+      size: Math.random() * 10 + 5,
+      duration: Math.random() * 10 + 10,
+      delay: Math.random() * 5,
+      scale: Math.random() * 0.5 + 0.5
+    }))
+  , []);
 
   return (
     <div className="relative overflow-hidden bg-gradient-to-b from-gray-900 to-gray-800 text-white">
-      {/* Animated Background Elements */}
+      {/* Enhanced Animated Background Elements */}
       <motion.div 
         className="absolute top-0 left-0 w-full h-full pointer-events-none"
         initial={{ opacity: 0 }}
         animate={{ opacity: 0.2 }}
         transition={{ duration: 1.5 }}
       >
-        <div className="absolute top-20 left-10 w-64 h-64 bg-blue-500 rounded-full filter blur-3xl opacity-20 mix-blend-overlay animate-float"></div>
-        <div className="absolute top-1/3 right-20 w-80 h-80 bg-purple-500 rounded-full filter blur-3xl opacity-20 mix-blend-overlay animate-float-delay"></div>
-        <div className="absolute bottom-20 left-1/4 w-72 h-72 bg-cyan-500 rounded-full filter blur-3xl opacity-20 mix-blend-overlay animate-float-delay-2"></div>
+        <motion.div 
+          className="absolute top-20 left-10 w-64 h-64 bg-blue-500 rounded-full filter blur-3xl opacity-20 mix-blend-overlay"
+          variants={floatingVariants}
+          animate="float"
+        />
+        <motion.div 
+          className="absolute top-1/3 right-20 w-80 h-80 bg-purple-500 rounded-full filter blur-3xl opacity-20 mix-blend-overlay"
+          variants={floatingVariants}
+          animate="floatDelay"
+        />
+        <motion.div 
+          className="absolute bottom-20 left-1/4 w-72 h-72 bg-cyan-500 rounded-full filter blur-3xl opacity-20 mix-blend-overlay"
+          variants={floatingVariants}
+          animate="floatDelay2"
+        />
       </motion.div>
 
-      {/* Hero Section */}
+      {/* Hero Section with adjusted spacing */}
       <section 
         id="home" 
-        className="min-h-screen flex items-center relative z-10 pt-24 pb-16"
+        className="min-h-screen flex items-center relative z-10 pt-32 pb-16" // Increased pt from 24 to 32
       >
         <div className="container mx-auto px-6 text-center">
-          {/* Animated Title with Subtle Floating Effect */}
+          {/* Animated Title with Enhanced Floating Effect */}
           <motion.div
             variants={containerVariants}
             initial="hidden"
@@ -200,6 +255,10 @@ const Home = () => {
             <motion.h1
               className="text-5xl md:text-7xl font-bold mb-6 tracking-tight"
               variants={itemVariants}
+              whileHover={{
+                scale: 1.02,
+                transition: { duration: 0.3 }
+              }}
             >
               <span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-purple-400 to-cyan-400">
                 Orion AI Technologies
@@ -214,7 +273,7 @@ const Home = () => {
             </motion.p>
           </motion.div>
 
-          {/* CTA Buttons */}
+          {/* CTA Buttons with Enhanced Animation */}
           <motion.div
             className="flex flex-col sm:flex-row justify-center gap-6 mb-24"
             variants={containerVariants}
@@ -224,7 +283,10 @@ const Home = () => {
             <motion.button
               className="px-10 py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-medium rounded-lg shadow-xl hover:shadow-2xl transition-all duration-300"
               variants={buttonVariants}
-              whileHover="hover"
+              whileHover={{
+                scale: 1.05,
+                boxShadow: "0 15px 30px -5px rgba(59, 130, 246, 0.5)"
+              }}
               whileTap="tap"
             >
               Discover Our Capabilities
@@ -232,7 +294,11 @@ const Home = () => {
             <motion.button
               className="px-10 py-4 border-2 border-blue-400 text-blue-100 font-medium rounded-lg hover:bg-blue-900/20 transition-all duration-300 backdrop-blur-sm"
               variants={buttonVariants}
-              whileHover="hover"
+              whileHover={{
+                scale: 1.05,
+                backgroundColor: "rgba(29, 78, 216, 0.15)",
+                boxShadow: "0 15px 30px -5px rgba(96, 165, 250, 0.3)"
+              }}
               whileTap="tap"
               onClick={() => navigate("/chatbot")}
             >
@@ -240,24 +306,52 @@ const Home = () => {
             </motion.button>
           </motion.div>
 
-          {/* Value Propositions Grid */}
+          {/* Value Propositions Grid with Lazy Loading */}
           <motion.div
             className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto"
-            variants={containerVariants}
             initial="hidden"
-            animate="visible"
+            whileInView="visible"
+            viewport={{ once: true, margin: "-100px" }}
+            variants={{
+              hidden: { opacity: 0 },
+              visible: {
+                opacity: 1,
+                transition: {
+                  staggerChildren: 0.2,
+                  delayChildren: 0.3,
+                },
+              },
+            }}
           >
             {valuePropositions.map((item, index) => (
               <motion.div
                 key={index}
                 className="bg-gray-800/30 p-8 rounded-xl border border-gray-700/50 shadow-lg backdrop-blur-sm hover:border-blue-400/30 transition-all duration-300"
-                variants={cardVariants}
-                whileHover="hover"
+                variants={{
+                  hidden: { opacity: 0, y: 40 },
+                  visible: {
+                    opacity: 1,
+                    y: 0,
+                    transition: {
+                      type: "spring",
+                      stiffness: 100,
+                      damping: 15,
+                    },
+                  },
+                }}
+                whileHover={{
+                  y: -10,
+                  boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.4)",
+                  transition: { duration: 0.4 }
+                }}
               >
                 <motion.div 
                   className="flex justify-center mb-6"
-                  whileHover={{ scale: 1.1 }}
-                  transition={{ type: "spring", stiffness: 400 }}
+                  whileHover={{ 
+                    scale: 1.15,
+                    rotate: 5,
+                    transition: { type: "spring", stiffness: 400 }
+                  }}
                 >
                   {item.icon}
                 </motion.div>
@@ -269,7 +363,7 @@ const Home = () => {
         </div>
       </section>
 
-      {/* Careers Section */}
+      {/* Careers Section with Enhanced Animations */}
       <section className="py-24 relative">
         <div className="absolute inset-0 bg-gradient-to-b from-gray-900/0 via-gray-900/70 to-gray-900 z-0"></div>
         <div className="container mx-auto px-6 relative z-10">
@@ -280,15 +374,29 @@ const Home = () => {
             viewport={{ once: true, margin: "-100px" }}
             className="text-center mb-20"
           >
-            <h2 className="text-3xl md:text-4xl font-bold mb-4 text-white">
+            <motion.h2 
+              className="text-3xl md:text-4xl font-bold mb-4 text-white"
+              whileInView={{
+                scale: [1, 1.02, 1],
+                transition: { duration: 1.5 }
+              }}
+              viewport={{ once: true }}
+            >
               Shape the Future With Us
-            </h2>
-            <p className="text-xl text-gray-300 max-w-3xl mx-auto">
+            </motion.h2>
+            <motion.p 
+              className="text-xl text-gray-300 max-w-3xl mx-auto"
+              whileInView={{
+                opacity: [0.8, 1],
+                transition: { duration: 1 }
+              }}
+              viewport={{ once: true }}
+            >
               Join our team of visionaries working at the forefront of artificial intelligence innovation.
-            </p>
+            </motion.p>
           </motion.div>
 
-          {/* Animated Join Button */}
+          {/* Enhanced Join Button Animation */}
           <motion.div
             className="flex justify-center mb-20"
             initial={{ opacity: 0, scale: 0.9 }}
@@ -297,19 +405,24 @@ const Home = () => {
             viewport={{ once: true }}
           >
             <motion.button
-              className="px-12 py-4 bg-gradient-to-r from-blue-500 to-cyan-500 text-white font-medium rounded-full shadow-xl hover:shadow-2xl transition-all duration-300"
+              className="px-12 py-4 bg-gradient-to-r from-blue-500 to-cyan-500 text-white font-medium rounded-full shadow-xl hover:shadow-2xl transition-all duration-300 relative overflow-hidden"
               whileHover={{ 
                 scale: 1.05,
-                boxShadow: "0 10px 25px -5px rgba(6, 182, 212, 0.4)"
+                boxShadow: "0 15px 30px -5px rgba(6, 182, 212, 0.5)"
               }}
               whileTap={{ scale: 0.98 }}
               onClick={() => navigate("/form")}
             >
-              Explore Career Opportunities
+              <span className="relative z-10">Explore Career Opportunities</span>
+              <motion.span
+                className="absolute inset-0 bg-gradient-to-r from-blue-600 to-cyan-600 opacity-0"
+                whileHover={{ opacity: 1 }}
+                transition={{ duration: 0.3 }}
+              />
             </motion.button>
           </motion.div>
 
-          {/* Infinite Roles Marquee */}
+          {/* Enhanced Infinite Roles Marquee */}
           <div className="relative overflow-hidden h-52">
             <motion.div
               className="absolute top-0 left-0 flex gap-8"
@@ -328,17 +441,21 @@ const Home = () => {
                   className="w-80 bg-gray-800/40 p-6 rounded-xl border border-gray-700/50 flex-shrink-0 backdrop-blur-sm hover:border-blue-400/30 transition-all duration-300"
                   initial={{ opacity: 0, x: 50 }}
                   whileInView={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.5 }}
+                  transition={{ duration: 0.5, delay: index * 0.05 }}
                   viewport={{ once: true }}
                   whileHover={{ 
-                    y: -5,
-                    boxShadow: "0 10px 20px -5px rgba(0, 0, 0, 0.2)"
+                    y: -8,
+                    boxShadow: "0 15px 30px -5px rgba(0, 0, 0, 0.3)",
+                    transition: { duration: 0.3 }
                   }}
                 >
                   <div className="flex items-start mb-4">
-                    <div className="mr-4 mt-1">
+                    <motion.div 
+                      className="mr-4 mt-1"
+                      whileHover={{ rotate: 15, scale: 1.1 }}
+                    >
                       {job.icon}
-                    </div>
+                    </motion.div>
                     <h3 className="text-lg font-semibold text-white">{job.role}</h3>
                   </div>
                   <p className="text-gray-300 text-sm pl-12">{job.description}</p>
@@ -349,42 +466,97 @@ const Home = () => {
         </div>
       </section>
 
-      {/* Floating Particles Animation */}
+      {/* Enhanced Floating Particles Animation */}
       <motion.div 
         className="absolute inset-0 overflow-hidden pointer-events-none"
         variants={fadeInVariants}
         initial="hidden"
         animate="visible"
       >
-        {[...Array(20)].map((_, i) => (
+        {particles.map((particle) => (
           <motion.div
-            key={i}
+            key={particle.id}
             className="absolute rounded-full bg-blue-500/10"
             initial={{
-              x: Math.random() * 100,
-              y: Math.random() * 100,
+              x: particle.x,
+              y: particle.y,
               opacity: 0,
               scale: 0,
             }}
             animate={{
               x: [null, Math.random() * 100],
               y: [null, Math.random() * 100],
-              opacity: [0, 0.3, 0],
-              scale: [0, Math.random() * 0.5 + 0.5, 0],
+              opacity: [0, 0.4, 0],
+              scale: [0, particle.scale, 0],
             }}
             transition={{
-              duration: Math.random() * 10 + 10,
+              duration: particle.duration,
+              delay: particle.delay,
               repeat: Infinity,
               repeatType: "reverse",
               ease: "easeInOut",
             }}
             style={{
-              width: `${Math.random() * 10 + 5}px`,
-              height: `${Math.random() * 10 + 5}px`,
-              left: `${Math.random() * 100}%`,
-              top: `${Math.random() * 100}%`,
+              width: `${particle.size}px`,
+              height: `${particle.size}px`,
+              left: `${particle.x}%`,
+              top: `${particle.y}%`,
             }}
           />
+        ))}
+      </motion.div>
+
+      {/* New Animated Connection Lines */}
+      <svg className="absolute top-0 left-0 w-full h-full pointer-events-none" xmlns="http://www.w3.org/2000/svg">
+        <motion.path
+          d="M100,100 C200,200 300,0 400,100"
+          stroke="rgba(96, 165, 250, 0.2)"
+          strokeWidth="1"
+          fill="none"
+          initial={{ pathLength: 0, opacity: 0 }}
+          animate={{ pathLength: 1, opacity: 0.3 }}
+          transition={{ duration: 2, delay: 1 }}
+        />
+        <motion.path
+          d="M800,50 C700,150 600,50 500,150"
+          stroke="rgba(139, 92, 246, 0.2)"
+          strokeWidth="1"
+          fill="none"
+          initial={{ pathLength: 0, opacity: 0 }}
+          animate={{ pathLength: 1, opacity: 0.3 }}
+          transition={{ duration: 2, delay: 1.5 }}
+        />
+      </svg>
+
+      {/* New Floating Tech Icons */}
+      <motion.div className="absolute inset-0 pointer-events-none">
+        {["react", "node", "python", "tensorflow", "aws", "docker"].map((tech, i) => (
+          <motion.div
+            key={tech}
+            className="absolute text-gray-600/10"
+            style={{
+              fontSize: `${Math.random() * 30 + 30}px`,
+              left: `${Math.random() * 90 + 5}%`,
+              top: `${Math.random() * 90 + 5}%`,
+            }}
+            animate={{
+              y: [0, -20, 0],
+              rotate: [0, Math.random() * 20 - 10, 0],
+            }}
+            transition={{
+              duration: Math.random() * 10 + 10,
+              repeat: Infinity,
+              ease: "easeInOut",
+              delay: i * 0.5,
+            }}
+          >
+            {tech === "react" && "⚛️"}
+            {tech === "node" && "⬢"}
+            {tech === "python" && "🐍"}
+            {tech === "tensorflow" && "🧠"}
+            {tech === "aws" && "☁️"}
+            {tech === "docker" && "🐳"}
+          </motion.div>
         ))}
       </motion.div>
     </div>
