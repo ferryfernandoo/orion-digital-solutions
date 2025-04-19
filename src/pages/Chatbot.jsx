@@ -1119,40 +1119,49 @@ const ChatBot = () => {
     background-color: currentColor;
   }
 
-  /* Chat Bubble (baru ditambah) */
-  .chat-bubble {
-    padding: 12px 16px;
-    margin-bottom: 12px;
-    border-radius: 16px;
-    max-width: 85%;
-    word-wrap: break-word;
-    animation: fadeInUp 0.3s ease;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.05);
-    transition: transform 0.3s ease, background-color 0.2s ease;
-  }
+  /* Chat Bubble (baru ditambah & diperhalus) */
+.chat-bubble {
+  padding: 12px 16px;
+  margin: 8px 0; /* jarak atas dan bawah antar bubble */
+  border-radius: 16px;
+  max-width: 85%;
+  word-wrap: break-word;
+  animation: fadeInUp 0.3s ease;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+  transition: transform 0.25s ease, background-color 0.2s ease, opacity 0.3s ease;
+  opacity: 0;
+  transform: translateY(10px);
+  animation-fill-mode: forwards;
+}
 
-  .chat-bubble.user {
-    align-self: flex-end;
-    background-color: ${darkMode ? '#3b82f6' : '#dbeafe'};
-    color: ${darkMode ? '#f8fafc' : '#1e3a8a'};
-  }
+.chat-bubble.user {
+  align-self: flex-end;
+  background-color: ${darkMode ? '#3b82f6' : '#dbeafe'};
+  color: ${darkMode ? '#f8fafc' : '#1e3a8a'};
+}
 
-  .chat-bubble.bot {
-    align-self: flex-start;
-    background-color: ${darkMode ? '#1e293b' : '#f1f5f9'};
-    color: ${darkMode ? '#e2e8f0' : '#334155'};
-  }
+.chat-bubble.bot {
+  align-self: flex-start;
+  background-color: ${darkMode ? '#1e293b' : '#f1f5f9'};
+  color: ${darkMode ? '#e2e8f0' : '#334155'};
+}
 
-  @keyframes fadeInUp {
-    0% {
-      opacity: 0;
-      transform: translateY(10px);
-    }
-    100% {
-      opacity: 1;
-      transform: translateY(0);
-    }
+/* Bubble hover/klik animation */
+.chat-bubble:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.08);
+}
+
+@keyframes fadeInUp {
+  0% {
+    opacity: 0;
+    transform: translateY(10px);
   }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
 
   /* Code Container */
   .code-container {
