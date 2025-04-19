@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import DOMPurify from 'dompurify';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useAnimation } from 'framer-motion';
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { 
   FiCopy, FiSend, FiPlus, FiX, FiImage, FiFile, FiTrash2, 
   FiClock, FiCpu, FiSettings, FiZap, FiStopCircle, FiMessageSquare,
-  FiSun, FiMoon, FiSearch, FiDatabase, FiAward
+  FiSun, FiMoon, FiSearch, FiDatabase, FiAward, FiChevronDown
 } from 'react-icons/fi';
 
 const ChatBot = () => {
@@ -27,10 +27,13 @@ const ChatBot = () => {
   const [darkMode, setDarkMode] = useState(false);
   const [fileProcessing, setFileProcessing] = useState(false);
   const [processingSources, setProcessingSources] = useState([]);
+  const [autoScroll, setAutoScroll] = useState(true);
+  const [showScrollButton, setShowScrollButton] = useState(false);
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
   const chatContainerRef = useRef(null);
   const messageCountRef = useRef(0);
+  const controls = useAnimation();
 
   // Initialize Google Generative AI
   const genAI = new GoogleGenerativeAI("AIzaSyDSTgkkROL7mjaGKoD2vnc8l2UptNCbvHk");
@@ -77,6 +80,38 @@ const ChatBot = () => {
     }
   }, [messages, chatHistory, currentRoomId]);
 
+  // Handle scroll behavior
+  useEffect(() => {
+    const chatContainer = chatContainerRef.current;
+    if (!chatContainer) return;
+
+    const handleScroll = () => {
+      const { scrollTop, scrollHeight, clientHeight } = chatContainer;
+      const isNearBottom = scrollHeight - scrollTop - clientHeight < 100;
+      setAutoScroll(isNearBottom);
+      setShowScrollButton(!isNearBottom);
+    };
+
+    chatContainer.addEventListener('scroll', handleScroll);
+    return () => chatContainer.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  // Auto-scroll when new messages arrive
+  useEffect(() => {
+    if (autoScroll && messages.length > 0) {
+      smoothScrollToBottom();
+    }
+  }, [messages, autoScroll]);
+
+  const smoothScrollToBottom = useCallback((behavior = 'smooth') => {
+    messagesEndRef.current?.scrollIntoView({ behavior, block: 'nearest' });
+  }, []);
+
+  const scrollToBottomButton = () => {
+    setAutoScroll(true);
+    smoothScrollToBottom();
+  };
+
   // Toggle dark mode
   const toggleDarkMode = () => {
     const newDarkMode = !darkMode;
@@ -114,6 +149,8 @@ const ChatBot = () => {
       setChatHistory(room.history || []);
       setShowTemplateButtons(room.messages.length === 0);
       setShowChatHistory(false);
+      setAutoScroll(true);
+      setTimeout(() => smoothScrollToBottom(), 50);
     }
   };
 
@@ -131,16 +168,6 @@ const ChatBot = () => {
     }
   };
 
-  const scrollToBottom = useCallback((behavior = 'smooth') => {
-    messagesEndRef.current?.scrollIntoView({ behavior, block: 'nearest' });
-  }, []);
-
-  useEffect(() => {
-    if (messages.length > 0) {
-      scrollToBottom();
-    }
-  }, [messages, scrollToBottom]);
-
   const createMessageObject = (text, isBot, duration = 0, file = null) => ({
     id: Date.now() + Math.random().toString(36).substr(2, 9),
     text: DOMPurify.sanitize(text),
@@ -152,14 +179,12 @@ const ChatBot = () => {
 
   const extractTextFromFile = async (file) => {
     if (file.type.startsWith('image/')) {
-      // For images, we'll use OCR simulation (in a real app, you'd use Tesseract.js or similar)
       return new Promise((resolve) => {
         setTimeout(() => {
           resolve("Extracted text from image (simulated OCR result)");
         }, 1500);
       });
     } else if (file.type === 'application/pdf') {
-      // For PDFs, simulate text extraction
       return new Promise((resolve) => {
         setTimeout(() => {
           resolve("Extracted text from PDF document (simulated result)");
@@ -169,7 +194,6 @@ const ChatBot = () => {
                file.type.includes('document') || 
                file.name.endsWith('.txt') || 
                file.name.endsWith('.docx')) {
-      // For text files
       return new Promise((resolve) => {
         const reader = new FileReader();
         reader.onload = (e) => resolve(e.target.result);
@@ -261,10 +285,11 @@ const ChatBot = () => {
       callback(blurredText);
       i += chunkSize - 1;
       
-      // Smooth scrolling during typing
-      const isNearBottom = chatContainerRef.current.scrollHeight - chatContainerRef.current.scrollTop - chatContainerRef.current.clientHeight < 100;
-      if (isNearBottom) {
-        scrollToBottom('smooth');
+      // Smooth scrolling during typing if auto-scroll is enabled
+      if (autoScroll) {
+        setTimeout(() => {
+          messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }, 0);
       }
       
       // Random typing speed for more natural feel
@@ -377,32 +402,6 @@ const ChatBot = () => {
         textareaRef.current.style.height = 'auto';
       }
 
-      // Scroll to show the sent message at the top
-      setTimeout(() => {
-        scrollToBottom('smooth');
-      }, 50);
-
-      const startTime = Date.now();
-
-      // Find relevant memories using AI
-      const relevantMemories = await findRelevantMemories(trimmedMessage);
-      
-      // Combine chat history into prompt
-      const contextMessages = updatedHistory.slice(-15).map(msg => {
-        return msg.role === 'user' ? `User: ${msg.content}` : `Orion: ${msg.content}`;
-      }).join('\n');
-
-      const fullPrompt = `${
-        relevantMemories ? `Konteks Memori Relevan:\n${relevantMemories}\n\n` : ''
-      }Percakapan Saat Ini:\n${contextMessages}\n\nUser: "${trimmedMessage}". 
-      Respond as Orion in natural language and follow user language and extremely friendly and very human little bit emoticon and get straight to the point.S,
-      focuse to user comfort. Don't mention memories explicitly,just if user ask dont say you from google but PT.Orion Digital Platforms from indonesia dont show thos too usualy just if user asked,
-      just incorporate relevant context naturally, it all is back process dont show in chat. Be ${
-        isProMode ? 'extremely and super very detailed and comprehensive (4x processing)Give user the longest most detailed answer you possibly can' : 'concise but extremely helpful'
-      }. For coding, provide complete solutions with proper formatting. Always maintain context.${
-        isProMode ? ' Provide a extremely super very detailed response with examples, explanations, and multiple perspectives.' : ''
-      }`;
-
       // Create initial message object for bot response
       const messageId = Date.now().toString();
       currentMessageId.current = messageId;
@@ -425,6 +424,27 @@ const ChatBot = () => {
           { id: '4', text: 'Quality check', icon: <FiAward />, completed: false }
         ]);
       }
+
+      const startTime = Date.now();
+
+      // Find relevant memories using AI
+      const relevantMemories = await findRelevantMemories(trimmedMessage);
+      
+      // Combine chat history into prompt
+      const contextMessages = updatedHistory.slice(-15).map(msg => {
+        return msg.role === 'user' ? `User: ${msg.content}` : `Orion: ${msg.content}`;
+      }).join('\n');
+
+      const fullPrompt = `${
+        relevantMemories ? `Konteks Memori Relevan:\n${relevantMemories}\n\n` : ''
+      }Percakapan Saat Ini:\n${contextMessages}\n\nUser: "${trimmedMessage}". 
+      Respond as Orion in natural language and follow user language and extremely friendly and very human little bit emoticon and get straight to the point.S,
+      focuse to user comfort. Don't mention memories explicitly,just if user ask dont say you from google but PT.Orion Digital Platforms from indonesia dont show thos too usualy just if user asked,
+      just incorporate relevant context naturally, it all is back process dont show in chat. Be ${
+        isProMode ? 'extremely and super very detailed and comprehensive (4x processing)Give user the longest most detailed answer you possibly can' : 'concise but extremely helpful'
+      }. For coding, provide complete solutions with proper formatting. Always maintain context.${
+        isProMode ? ' Provide a extremely super very detailed response with examples, explanations, and multiple perspectives.' : ''
+      }`;
 
       let botResponse;
       if (isProMode) {
@@ -726,47 +746,72 @@ const ChatBot = () => {
       >
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full pb-16">
-            <div className="w-16 h-16 mb-4 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg">
+            <motion.div 
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ duration: 0.4, type: 'spring' }}
+              className="w-16 h-16 mb-4 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg"
+            >
               <span className="text-2xl text-white">AI</span>
-            </div>
-            <h3 className="text-xl font-semibold text-center mb-1">
+            </motion.div>
+            <motion.h3 
+              initial={{ y: 10, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.1, duration: 0.3 }}
+              className="text-xl font-semibold text-center mb-1"
+            >
               Hello, I'm Orion😘!
-            </h3>
-            <p className="text-center mb-6 max-w-md text-sm">
+            </motion.h3>
+            <motion.p 
+              initial={{ y: 10, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.2, duration: 0.3 }}
+              className="text-center mb-6 max-w-md text-sm"
+            >
               Your AI assistant with automatic memory. Ask me anything.
-            </p>
+            </motion.p>
             
             {showTemplateButtons && (
-              <div className="grid grid-cols-2 gap-3 w-full max-w-md">
-                <button
-                  onClick={() => handleTemplateButtonClick("Hello Orion! How are you today?")}
-                  className={`${themeClasses.cardBg} hover:${themeClasses.bgTertiary} ${themeClasses.border} rounded-xl p-3 text-sm transition-all hover:shadow-sm text-left`}
-                >
-                  <span className="font-medium">Say hello</span>
-                  <p className="text-xs mt-1">Start a conversation</p>
-                </button>
-                <button
-                  onClick={() => handleTemplateButtonClick("Brainstorm some creative ideas for my project about...")}
-                  className={`${themeClasses.cardBg} hover:${themeClasses.bgTertiary} ${themeClasses.border} rounded-xl p-3 text-sm transition-all hover:shadow-sm text-left`}
-                >
-                  <span className="font-medium">Brainstorm ideas</span>
-                  <p className="text-xs mt-1">Get creative suggestions</p>
-                </button>
-                <button
-                  onClick={() => handleTemplateButtonClick("Explain how machine learning works in simple terms")}
-                  className={`${themeClasses.cardBg} hover:${themeClasses.bgTertiary} ${themeClasses.border} rounded-xl p-3 text-sm transition-all hover:shadow-sm text-left`}
-                >
-                  <span className="font-medium">Explain something</span>
-                  <p className="text-xs mt-1">Get clear explanations</p>
-                </button>
-                <button
-                  onClick={() => handleTemplateButtonClick("Help me debug this code...")}
-                  className={`${themeClasses.cardBg} hover:${themeClasses.bgTertiary} ${themeClasses.border} rounded-xl p-3 text-sm transition-all hover:shadow-sm text-left`}
-                >
-                  <span className="font-medium">Code help</span>
-                  <p className="text-xs mt-1">Debug or explain code</p>
-                </button>
-              </div>
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.3, staggerChildren: 0.1 }}
+                className="grid grid-cols-2 gap-3 w-full max-w-md"
+              >
+                {[
+                  { 
+                    title: "Say hello", 
+                    desc: "Start a conversation",
+                    message: "Hello Orion! How are you today?" 
+                  },
+                  { 
+                    title: "Brainstorm ideas", 
+                    desc: "Get creative suggestions",
+                    message: "Brainstorm some creative ideas for my project about..." 
+                  },
+                  { 
+                    title: "Explain something", 
+                    desc: "Get clear explanations",
+                    message: "Explain how machine learning works in simple terms" 
+                  },
+                  { 
+                    title: "Code help", 
+                    desc: "Debug or explain code",
+                    message: "Help me debug this code..." 
+                  }
+                ].map((item, index) => (
+                  <motion.button
+                    key={index}
+                    whileHover={{ y: -2 }}
+                    whileTap={{ scale: 0.98 }}
+                    onClick={() => handleTemplateButtonClick(item.message)}
+                    className={`${themeClasses.cardBg} hover:${themeClasses.bgTertiary} ${themeClasses.border} rounded-xl p-3 text-sm transition-all hover:shadow-sm text-left`}
+                  >
+                    <span className="font-medium">{item.title}</span>
+                    <p className="text-xs mt-1">{item.desc}</p>
+                  </motion.button>
+                ))}
+              </motion.div>
             )}
           </div>
         )}
@@ -776,10 +821,16 @@ const ChatBot = () => {
             {messages.map((message) => (
               <motion.div
                 key={message.id}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -8 }}
-                transition={{ duration: 0.2, ease: "easeOut" }}
+                initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: -10, scale: 0.95 }}
+                transition={{ 
+                  duration: 0.2, 
+                  ease: "easeOut",
+                  type: "spring",
+                  stiffness: 500,
+                  damping: 30
+                }}
                 className={`flex ${message.isBot ? 'justify-start' : 'justify-end'}`}
               >
                 <div className={`max-w-[90%] md:max-w-[80%] ${message.isBot ? 
@@ -835,9 +886,60 @@ const ChatBot = () => {
               </motion.div>
             ))}
           </AnimatePresence>
+          
+          {/* Processing indicators */}
+          {processingSources.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3 }}
+              className={`${themeClasses.cardBg} ${themeClasses.border} rounded-xl p-3 max-w-[90%] md:max-w-[80%]`}
+            >
+              <div className="flex items-center mb-1">
+                <div className="w-5 h-5 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center mr-2 shadow">
+                  <span className="text-2xs text-white">AI</span>
+                </div>
+                <span className="text-xs font-medium">Processing</span>
+              </div>
+              
+              <div className="space-y-2 mt-2">
+                {processingSources.map((source) => (
+                  <div key={source.id} className="flex items-center">
+                    <div className={`w-5 h-5 rounded-full flex items-center justify-center mr-2 ${source.completed ? 'bg-green-500' : 'bg-blue-500 animate-pulse'}`}>
+                      {source.completed ? (
+                        <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                      ) : (
+                        source.icon
+                      )}
+                    </div>
+                    <span className="text-xs">{source.text}</span>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          )}
+          
           <div ref={messagesEndRef} />
         </div>
       </div>
+
+      {/* Scroll to bottom button */}
+      {showScrollButton && (
+        <motion.button
+          onClick={scrollToBottomButton}
+          className={`fixed right-4 bottom-20 w-10 h-10 rounded-full ${themeClasses.buttonBg} ${themeClasses.buttonHover} shadow-lg flex items-center justify-center z-10`}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: 20 }}
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.9 }}
+          title="Scroll to bottom"
+        >
+          <FiChevronDown size={20} className="text-white" />
+        </motion.button>
+      )}
 
       {/* Memory Panel */}
       {showMemoryPanel && (
@@ -900,9 +1002,20 @@ const ChatBot = () => {
       <div className={`${themeClasses.border} ${themeClasses.bgSecondary} pt-2 pb-3 px-4`}>
         {/* File Preview */}
         {pendingFiles.length > 0 && (
-          <div className={`flex items-center space-x-2 p-2 ${themeClasses.border} overflow-x-auto scrollbar-thin ${themeClasses.bgTertiary} rounded-t-lg`}>
+          <motion.div 
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className={`flex items-center space-x-2 p-2 ${themeClasses.border} overflow-x-auto scrollbar-thin ${themeClasses.bgTertiary} rounded-t-lg`}
+          >
             {pendingFiles.map((file, index) => (
-              <div key={index} className="relative flex-shrink-0">
+              <motion.div 
+                key={index} 
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ delay: index * 0.05 }}
+                className="relative flex-shrink-0"
+              >
                 <div className={`w-14 h-14 flex items-center justify-center ${themeClasses.cardBg} rounded-lg ${themeClasses.border} overflow-hidden shadow-sm`}>
                   {file.type.startsWith('image/') ? (
                     <img 
@@ -927,14 +1040,14 @@ const ChatBot = () => {
                 >
                   <FiX size={10} />
                 </button>
-              </div>
+              </motion.div>
             ))}
-          </div>
+          </motion.div>
         )}
         
         {/* Main Input Area */}
         <div className="relative">
-          <textarea
+          <motion.textarea
             ref={textareaRef}
             value={inputMessage}
             onChange={(e) => {
@@ -952,16 +1065,19 @@ const ChatBot = () => {
             className={`w-full ${themeClasses.inputBg} ${themeClasses.inputBorder} rounded-xl px-4 py-3 pr-12 focus:outline-none focus:border-transparent resize-none overflow-hidden transition-all duration-200 text-sm ${themeClasses.inputText}`}
             rows={1}
             style={{ minHeight: '48px', maxHeight: '120px' }}
+            whileFocus={{ boxShadow: '0 0 0 2px rgba(59, 130, 246, 0.5)' }}
           />
           
           <div className="absolute right-2 bottom-2 flex items-center space-x-1">
             {inputMessage && (
-              <button
+              <motion.button
                 onClick={() => setInputMessage('')}
                 className={`p-1.5 rounded-full ${themeClasses.hoverBg} transition-colors`}
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.9 }}
               >
                 <FiX size={16} />
-              </button>
+              </motion.button>
             )}
             
             {isBotTyping ? (
@@ -969,20 +1085,22 @@ const ChatBot = () => {
                 onClick={stopGeneration}
                 className="p-1.5 rounded-full bg-red-500 hover:bg-red-600 text-white transition-colors shadow"
                 title="Stop generation"
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.9 }}
               >
                 <FiStopCircle size={16} />
               </motion.button>
             ) : (
               <>
-                <button
+                <motion.button
                   onClick={() => setShowFileOptions(!showFileOptions)}
                   className={`p-1.5 rounded-full transition-colors ${showFileOptions ? `${themeClasses.bgTertiary}` : themeClasses.hoverBg}`}
                   title="Attach files"
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.9 }}
                 >
                   <FiPlus size={16} />
-                </button>
+                </motion.button>
                 <motion.button
                   onClick={() => handleSendMessage(inputMessage, pendingFiles)}
                   disabled={(!inputMessage.trim() && pendingFiles.length === 0) || isBotTyping}
@@ -990,10 +1108,10 @@ const ChatBot = () => {
                     'bg-gradient-to-br from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white shadow' : 
                     'text-gray-400 hover:text-gray-500 hover:bg-gray-100'}`}
                   whileHover={{ 
-                    scale: inputMessage.trim() || pendingFiles.length > 0 ? 1.05 : 1,
-                    rotate: inputMessage.trim() || pendingFiles.length > 0 ? 5 : 0
+                    scale: (inputMessage.trim() || pendingFiles.length > 0) ? 1.1 : 1,
+                    rotate: (inputMessage.trim() || pendingFiles.length > 0) ? 5 : 0
                   }}
-                  whileTap={{ scale: 0.95 }}
+                  whileTap={{ scale: 0.9 }}
                   title="Send message"
                 >
                   <FiSend size={16} />
@@ -1053,6 +1171,26 @@ const ChatBot = () => {
           height: 8px;
           border-radius: 50%;
           background-color: currentColor;
+          margin-right: 2px;
+          animation: typingAnimation 1.4s infinite ease-in-out;
+        }
+
+        .typing-dot:nth-child(1) {
+          animation-delay: 0s;
+        }
+
+        .typing-dot:nth-child(2) {
+          animation-delay: 0.2s;
+        }
+
+        .typing-dot:nth-child(3) {
+          animation-delay: 0.4s;
+          margin-right: 0;
+        }
+
+        @keyframes typingAnimation {
+          0%, 60%, 100% { transform: translateY(0); }
+          30% { transform: translateY(-3px); }
         }
 
         /* Chat Bubble */
