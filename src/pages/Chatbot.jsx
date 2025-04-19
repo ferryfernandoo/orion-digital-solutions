@@ -255,7 +255,10 @@ const ChatBot = () => {
       const chunkSize = Math.floor(Math.random() * 5) + 3;
       const chunk = words.slice(i, i + chunkSize).join(' ');
       displayedText += (i === 0 ? '' : ' ') + chunk;
-      callback(displayedText);
+      
+      // Apply blur effect during typing
+      const blurredText = `<span style="filter: blur(0.5px); opacity: 0.8;">${displayedText}</span>`;
+      callback(blurredText);
       i += chunkSize - 1;
       
       // Smooth scrolling during typing
@@ -267,6 +270,9 @@ const ChatBot = () => {
       // Random typing speed for more natural feel
       await new Promise(resolve => setTimeout(resolve, Math.random() * 50 + 50));
     }
+    
+    // Remove blur effect when done
+    callback(fullText);
   };
 
   const enhanceWithProMode = async (initialResponse, prompt) => {
@@ -717,178 +723,122 @@ const ChatBot = () => {
       <div 
         ref={chatContainerRef}
         className={`flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-gray-500 scrollbar-track-transparent ${themeClasses.bgPrimary}`}
+        style={{ display: 'flex', flexDirection: 'column-reverse' }}
       >
-        {messages.length === 0 && (
-          <div className="flex flex-col items-center justify-center h-full pb-16">
-            <div className="w-16 h-16 mb-4 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg">
-              <span className="text-2xl text-white">AI</span>
-            </div>
-            <h3 className="text-xl font-semibold text-center mb-1">
-              Hello, I'm Orion😘!
-            </h3>
-            <p className="text-center mb-6 max-w-md text-sm">
-              Your AI assistant with automatic memory. Ask me anything.
-            </p>
-            
-            {showTemplateButtons && (
-              <div className="grid grid-cols-2 gap-3 w-full max-w-md">
-                <button
-                  onClick={() => handleTemplateButtonClick("Hello Orion! How are you today?")}
-                  className={`${themeClasses.cardBg} hover:${themeClasses.bgTertiary} ${themeClasses.border} rounded-xl p-3 text-sm transition-all hover:shadow-sm text-left`}
-                >
-                  <span className="font-medium">Say hello</span>
-                  <p className="text-xs mt-1">Start a conversation</p>
-                </button>
-                <button
-                  onClick={() => handleTemplateButtonClick("Brainstorm some creative ideas for my project about...")}
-                  className={`${themeClasses.cardBg} hover:${themeClasses.bgTertiary} ${themeClasses.border} rounded-xl p-3 text-sm transition-all hover:shadow-sm text-left`}
-                >
-                  <span className="font-medium">Brainstorm ideas</span>
-                  <p className="text-xs mt-1">Get creative suggestions</p>
-                </button>
-                <button
-                  onClick={() => handleTemplateButtonClick("Explain how machine learning works in simple terms")}
-                  className={`${themeClasses.cardBg} hover:${themeClasses.bgTertiary} ${themeClasses.border} rounded-xl p-3 text-sm transition-all hover:shadow-sm text-left`}
-                >
-                  <span className="font-medium">Explain something</span>
-                  <p className="text-xs mt-1">Get clear explanations</p>
-                </button>
-                <button
-                  onClick={() => handleTemplateButtonClick("Help me debug this code...")}
-                  className={`${themeClasses.cardBg} hover:${themeClasses.bgTertiary} ${themeClasses.border} rounded-xl p-3 text-sm transition-all hover:shadow-sm text-left`}
-                >
-                  <span className="font-medium">Code help</span>
-                  <p className="text-xs mt-1">Debug or explain code</p>
-                </button>
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          {/* Messages in reverse order */}
+          {messages.length === 0 && (
+            <div className="flex flex-col items-center justify-center h-full pb-16">
+              <div className="w-16 h-16 mb-4 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg">
+                <span className="text-2xl text-white">AI</span>
               </div>
-            )}
-          </div>
-        )}
-
-        <AnimatePresence>
-          {messages.map((message) => (
-            <motion.div
-              key={message.id}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: 0.2, ease: "easeOut" }}
-              className={`flex ${message.isBot ? 'justify-start' : 'justify-end'}`}
-            >
-              <div className={`max-w-[90%] md:max-w-[80%] ${message.isBot ? 
-                `${themeClasses.cardBg} ${themeClasses.border}` : 
-                'bg-gradient-to-br from-blue-600 to-blue-500 text-white'} rounded-2xl p-3 shadow-xs`}
-              >
-                {message.isBot && (
-                  <div className="flex items-center mb-1">
-                    <div className="w-5 h-5 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center mr-2 shadow">
-                      <span className="text-2xs text-white">AI</span>
-                    </div>
-                    <span className="text-xs font-medium">Orion</span>
-                  </div>
-                )}
-                
-                {message.file ? (
-                  <div>
-                    <p className={`text-xs mb-1 ${message.isBot ? themeClasses.textTertiary : 'text-blue-100'}`}>File: {message.file.name}</p>
-                    {message.file.type.startsWith('image/') && (
-                      <img 
-                        src={URL.createObjectURL(message.file)} 
-                        alt="Uploaded" 
-                        className="mt-1 max-w-full h-auto rounded-lg border border-gray-200 shadow-sm" 
-                      />
-                    )}
-                  </div>
-                ) : (
-                  <div 
-                    className={`text-sm ${message.isBot ? themeClasses.textPrimary : 'text-white'}`}
-                    dangerouslySetInnerHTML={{ __html: message.text }} 
-                  />
-                )}
-                
-                <div className="flex items-center justify-between mt-1">
-                  <span className={`text-xs ${message.isBot ? themeClasses.textTertiary : 'text-blue-100'}`}>
-                    {message.time}
-                    {message.isBot && message.duration > 0 && (
-                      <span> • {(message.duration / 1000).toFixed(1)}s</span>
-                    )}
-                  </span>
-                  
-                  {message.isBot && (
-                    <button
-                      onClick={() => copyToClipboard(message.text.replace(/<[^>]*>?/gm, ''))}
-                      className="text-xs opacity-60 hover:opacity-100 transition-opacity ml-2"
-                      title="Copy to clipboard"
-                    >
-                      <FiCopy size={14} />
-                    </button>
-                  )}
-                </div>
-              </div>
-            </motion.div>
-          ))}
-        </AnimatePresence>
-        
-        {(isBotTyping || fileProcessing) && (
-          <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.2, ease: "easeOut" }}
-            className="flex justify-start"
-          >
-            <div className={`${themeClasses.cardBg} ${themeClasses.border} rounded-2xl p-3 max-w-[80%] shadow-xs`}>
-              <div className="flex items-center space-x-2">
-                <div className="flex space-x-1">
-                  <motion.span
-                    className="typing-dot"
-                    animate={{ opacity: [0.2, 1, 0.2], scale: [0.8, 1.1, 0.8] }}
-                    transition={{ duration: 1.2, repeat: Infinity }}
-                  />
-                  <motion.span
-                    className="typing-dot"
-                    animate={{ opacity: [0.2, 1, 0.2], scale: [0.8, 1.1, 0.8] }}
-                    transition={{ duration: 1.2, repeat: Infinity, delay: 0.3 }}
-                  />
-                  <motion.span
-                    className="typing-dot"
-                    animate={{ opacity: [0.2, 1, 0.2], scale: [0.8, 1.1, 0.8] }}
-                    transition={{ duration: 1.2, repeat: Infinity, delay: 0.6 }}
-                  />
-                </div>
-                <span className="text-sm">
-                  {fileProcessing ? 'Processing files...' : 
-                   isProMode ? 'Processing deeply...' : 'Thinking...'}
-                </span>
-                <button
-                  onClick={stopGeneration}
-                  className="ml-2 text-xs bg-red-500 hover:bg-red-600 text-white px-2 py-0.5 rounded-full transition-colors flex items-center"
-                >
-                  <FiStopCircle size={12} className="mr-1" />
-                  Stop
-                </button>
-              </div>
-
-              {/* Processing sources for Pro Mode */}
-              {isProMode && processingSources.length > 0 && (
-                <div className="mt-2 pt-2 border-t border-gray-200">
-                  <div className="grid grid-cols-2 gap-2">
-                    {processingSources.map((source) => (
-                      <div key={source.id} className="flex items-center space-x-2">
-                        <span className={`text-xs ${source.completed ? 'text-green-500' : 'text-blue-500'}`}>
-                          {source.icon}
-                        </span>
-                        <span className="text-xs">
-                          {source.text}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
+              <h3 className="text-xl font-semibold text-center mb-1">
+                Hello, I'm Orion😘!
+              </h3>
+              <p className="text-center mb-6 max-w-md text-sm">
+                Your AI assistant with automatic memory. Ask me anything.
+              </p>
+              
+              {showTemplateButtons && (
+                <div className="grid grid-cols-2 gap-3 w-full max-w-md">
+                  <button
+                    onClick={() => handleTemplateButtonClick("Hello Orion! How are you today?")}
+                    className={`${themeClasses.cardBg} hover:${themeClasses.bgTertiary} ${themeClasses.border} rounded-xl p-3 text-sm transition-all hover:shadow-sm text-left`}
+                  >
+                    <span className="font-medium">Say hello</span>
+                    <p className="text-xs mt-1">Start a conversation</p>
+                  </button>
+                  <button
+                    onClick={() => handleTemplateButtonClick("Brainstorm some creative ideas for my project about...")}
+                    className={`${themeClasses.cardBg} hover:${themeClasses.bgTertiary} ${themeClasses.border} rounded-xl p-3 text-sm transition-all hover:shadow-sm text-left`}
+                  >
+                    <span className="font-medium">Brainstorm ideas</span>
+                    <p className="text-xs mt-1">Get creative suggestions</p>
+                  </button>
+                  <button
+                    onClick={() => handleTemplateButtonClick("Explain how machine learning works in simple terms")}
+                    className={`${themeClasses.cardBg} hover:${themeClasses.bgTertiary} ${themeClasses.border} rounded-xl p-3 text-sm transition-all hover:shadow-sm text-left`}
+                  >
+                    <span className="font-medium">Explain something</span>
+                    <p className="text-xs mt-1">Get clear explanations</p>
+                  </button>
+                  <button
+                    onClick={() => handleTemplateButtonClick("Help me debug this code...")}
+                    className={`${themeClasses.cardBg} hover:${themeClasses.bgTertiary} ${themeClasses.border} rounded-xl p-3 text-sm transition-all hover:shadow-sm text-left`}
+                  >
+                    <span className="font-medium">Code help</span>
+                    <p className="text-xs mt-1">Debug or explain code</p>
+                  </button>
                 </div>
               )}
             </div>
-          </motion.div>
-        )}
-        <div ref={messagesEndRef} />
+          )}
+
+          <AnimatePresence>
+            {messages.map((message) => (
+              <motion.div
+                key={message.id}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.2, ease: "easeOut" }}
+                className={`flex ${message.isBot ? 'justify-start' : 'justify-end'}`}
+              >
+                <div className={`max-w-[90%] md:max-w-[80%] ${message.isBot ? 
+                  `${themeClasses.cardBg} ${themeClasses.border}` : 
+                  'bg-gradient-to-br from-blue-600 to-blue-500 text-white'} rounded-2xl p-3 shadow-xs`}
+                >
+                  {message.isBot && (
+                    <div className="flex items-center mb-1">
+                      <div className="w-5 h-5 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center mr-2 shadow">
+                        <span className="text-2xs text-white">AI</span>
+                      </div>
+                      <span className="text-xs font-medium">Orion</span>
+                    </div>
+                  )}
+                  
+                  {message.file ? (
+                    <div>
+                      <p className={`text-xs mb-1 ${message.isBot ? themeClasses.textTertiary : 'text-blue-100'}`}>File: {message.file.name}</p>
+                      {message.file.type.startsWith('image/') && (
+                        <img 
+                          src={URL.createObjectURL(message.file)} 
+                          alt="Uploaded" 
+                          className="mt-1 max-w-full h-auto rounded-lg border border-gray-200 shadow-sm" 
+                        />
+                      )}
+                    </div>
+                  ) : (
+                    <div 
+                      className={`text-sm ${message.isBot ? themeClasses.textPrimary : 'text-white'}`}
+                      dangerouslySetInnerHTML={{ __html: message.text }} 
+                    />
+                  )}
+                  
+                  <div className="flex items-center justify-between mt-1">
+                    <span className={`text-xs ${message.isBot ? themeClasses.textTertiary : 'text-blue-100'}`}>
+                      {message.time}
+                      {message.isBot && message.duration > 0 && (
+                        <span> • {(message.duration / 1000).toFixed(1)}s</span>
+                      )}
+                    </span>
+                    
+                    {message.isBot && (
+                      <button
+                        onClick={() => copyToClipboard(message.text.replace(/<[^>]*>?/gm, ''))}
+                        className="text-xs opacity-60 hover:opacity-100 transition-opacity ml-2"
+                        title="Copy to clipboard"
+                      >
+                        <FiCopy size={14} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </motion.div>
+            ))}
+          </AnimatePresence>
+          <div ref={messagesEndRef} />
+        </div>
       </div>
 
       {/* Memory Panel */}
@@ -942,6 +892,68 @@ const ChatBot = () => {
                     <p className="text-xs mt-1">{memory.date}</p>
                   </div>
                 ))}
+              </div>
+            )}
+          </div>
+        </motion.div>
+      )}
+
+      {/* Typing Indicator (Bottom Right) */}
+      {(isBotTyping || fileProcessing) && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: 20 }}
+          transition={{ duration: 0.2 }}
+          className="fixed bottom-20 right-4 z-10"
+        >
+          <div className={`${themeClasses.cardBg} ${themeClasses.border} rounded-2xl p-3 shadow-lg max-w-xs`}>
+            <div className="flex items-center space-x-2">
+              <div className="flex space-x-1">
+                <motion.span
+                  className="typing-dot"
+                  animate={{ opacity: [0.2, 1, 0.2], scale: [0.8, 1.1, 0.8] }}
+                  transition={{ duration: 1.2, repeat: Infinity }}
+                />
+                <motion.span
+                  className="typing-dot"
+                  animate={{ opacity: [0.2, 1, 0.2], scale: [0.8, 1.1, 0.8] }}
+                  transition={{ duration: 1.2, repeat: Infinity, delay: 0.3 }}
+                />
+                <motion.span
+                  className="typing-dot"
+                  animate={{ opacity: [0.2, 1, 0.2], scale: [0.8, 1.1, 0.8] }}
+                  transition={{ duration: 1.2, repeat: Infinity, delay: 0.6 }}
+                />
+              </div>
+              <span className="text-sm">
+                {fileProcessing ? 'Processing files...' : 
+                 isProMode ? 'Processing deeply...' : 'Thinking...'}
+              </span>
+              <button
+                onClick={stopGeneration}
+                className="ml-2 text-xs bg-red-500 hover:bg-red-600 text-white px-2 py-0.5 rounded-full transition-colors flex items-center"
+              >
+                <FiStopCircle size={12} className="mr-1" />
+                Stop
+              </button>
+            </div>
+
+            {/* Processing sources for Pro Mode */}
+            {isProMode && processingSources.length > 0 && (
+              <div className="mt-2 pt-2 border-t border-gray-200">
+                <div className="grid grid-cols-2 gap-2">
+                  {processingSources.map((source) => (
+                    <div key={source.id} className="flex items-center space-x-2">
+                      <span className={`text-xs ${source.completed ? 'text-green-500' : 'text-blue-500'}`}>
+                        {source.icon}
+                      </span>
+                      <span className="text-xs">
+                        {source.text}
+                      </span>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </div>
@@ -1098,202 +1110,251 @@ const ChatBot = () => {
       </div>
       
       <style jsx global>{`
-        /* Modern Typing Animation */
-        .typing-dot {
-          display: inline-block;
-          width: 8px;
-          height: 8px;
-          border-radius: 50%;
-          background-color: currentColor;
-        }
+  /* Typing Dot */
+  .typing-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: currentColor;
+  }
 
-        /* Enhanced Code Container */
-        .code-container {
-          background: ${darkMode ? '#1e293b' : '#f8fafc'};
-          border-radius: 12px;
-          margin: 1em 0;
-          overflow: hidden;
-          border: 1px solid ${darkMode ? '#334155' : '#e2e8f0'};
-          box-shadow: 0 4px 12px rgba(0,0,0,0.03);
-          transition: all 0.25s cubic-bezier(0.4,0,0.2,1);
-        }
-        .code-container:hover {
-          box-shadow: 0 6px 16px rgba(0,0,0,0.05);
-          transform: translateY(-2px);
-        }
+  /* Chat Bubble (baru ditambah) */
+  .chat-bubble {
+    padding: 12px 16px;
+    margin-bottom: 12px;
+    border-radius: 16px;
+    max-width: 85%;
+    word-wrap: break-word;
+    animation: fadeInUp 0.3s ease;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+    transition: transform 0.3s ease, background-color 0.2s ease;
+  }
 
-        /* Sleek Code Toolbar */
-        .code-toolbar {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          padding: 0.75em 1em;
-          background: ${darkMode ? '#1e293b' : '#f1f5f9'};
-          color: ${darkMode ? '#94a3b8' : '#475569'};
-          font-size: 0.85em;
-          border-bottom: 1px solid ${darkMode ? '#334155' : '#e2e8f0'};
-        }
+  .chat-bubble.user {
+    align-self: flex-end;
+    background-color: ${darkMode ? '#3b82f6' : '#dbeafe'};
+    color: ${darkMode ? '#f8fafc' : '#1e3a8a'};
+  }
 
-        /* Modern Language Tag */
-        .language-tag {
-          background: ${darkMode ? '#334155' : '#e2e8f0'};
-          padding: 0.3em 0.8em;
-          border-radius: 8px;
-          font-size: 0.8em;
-          font-weight: 500;
-          letter-spacing: 0.02em;
-          transition: all 0.2s ease;
-        }
+  .chat-bubble.bot {
+    align-self: flex-start;
+    background-color: ${darkMode ? '#1e293b' : '#f1f5f9'};
+    color: ${darkMode ? '#e2e8f0' : '#334155'};
+  }
 
-        /* Improved Copy Button */
-        .copy-button {
-          background: transparent;
-          border: 1px solid ${darkMode ? '#475569' : '#cbd5e1'};
-          color: ${darkMode ? '#e2e8f0' : '#334155'};
-          cursor: pointer;
-          padding: 0.4em 0.8em;
-          border-radius: 8px;
-          font-size: 0.8em;
-          display: flex;
-          align-items: center;
-          gap: 0.4em;
-          transition: all 0.2s ease;
-        }
-        .copy-button:hover {
-          background: ${darkMode ? '#334155' : '#e2e8f0'};
-          border-color: ${darkMode ? '#64748b' : '#94a3b8'};
-          transform: translateY(-1px);
-        }
-        .copy-button:active {
-          transform: translateY(0);
-        }
+  @keyframes fadeInUp {
+    0% {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
 
-        /* Refined Code Block */
-        .code-block {
-          margin: 0;
-          padding: 1em;
-          color: black;
-          overflow-x: auto;
-          font-family: 'Fira Code', 'JetBrains Mono', 'Courier New', monospace;
-          font-size: 0.9em;
-          line-height: 1.6;
-          color: ${darkMode ? '#f1f5f9' : '#1e293b'};
-          background: ${darkMode ? '#1e293b' : '#f8fafc'};
-          scrollbar-width: thin;
-          scrollbar-color: ${darkMode ? '#475569' : '#cbd5e1'} transparent;
-        }
-        .code-block::-webkit-scrollbar {
-          height: 6px;
-        }
-        .code-block::-webkit-scrollbar-thumb {
-          background: ${darkMode ? '#475569' : '#cbd5e1'};
-          border-radius: 3px;
-        }
-        .code-block code {
-          font-family: inherit;
-          font-variant-ligatures: contextual;
-        }
+  /* Code Container */
+  .code-container {
+    background: ${darkMode ? '#1e293b' : '#f8fafc'};
+    border-radius: 12px;
+    margin: 1em 0;
+    overflow: hidden;
+    border: 1px solid ${darkMode ? '#334155' : '#e2e8f0'};
+    box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+    transition: all 0.25s cubic-bezier(0.4,0,0.2,1);
+  }
+  .code-container:hover {
+    box-shadow: 0 6px 16px rgba(0,0,0,0.05);
+    transform: translateY(-2px);
+  }
 
-        /* Smoother Notification */
-        .copy-notification {
-          position: fixed;
-          bottom: 24px;
-          left: 50%;
-          transform: translateX(-50%) translateY(10px);
-          background: rgba(15,23,42,0.95);
-          color: white;
-          padding: 12px 24px;
-          border-radius: 12px;
-          font-size: 0.9em;
-          z-index: 1000;
-          animation: slideUp 0.3s ease-out forwards, fadeOut 0.5s ease-in 1.5s forwards;
-          box-shadow: 0 8px 24px rgba(0,0,0,0.15);
-          font-weight: 500;
-        }
-        @keyframes slideUp {
-          from { opacity: 0; transform: translateX(-50%) translateY(10px); }
-          to { opacity: 1; transform: translateX(-50%) translateY(0); }
-        }
-        @keyframes fadeOut {
-          to { opacity: 0; }
-        }
+  .code-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75em 1em;
+    background: ${darkMode ? '#1e293b' : '#f1f5f9'};
+    color: ${darkMode ? '#94a3b8' : '#475569'};
+    font-size: 0.85em;
+    border-bottom: 1px solid ${darkMode ? '#334155' : '#e2e8f0'};
+  }
 
-        /* Enhanced Prose Styles */
-        .prose {
-          max-width: 100%;
-          font-size: 0.95rem;
-          line-height: 1.7;
-          color: ${darkMode ? '#e2e8f0' : '#334155'};
-        }
-        .prose ul {
-          list-style-type: disc;
-          padding-left: 1.5em;
-          margin: 0.5em 0;
-        }
-        .prose li {
-          margin: 0.25em 0;
-        }
-        .prose code:not(.code-block code) {
-          background: ${darkMode ? 'rgba(148,163,184,0.2)' : 'rgba(148,163,184,0.15)'};
-          padding: 0.2em 0.4em;
-          border-radius: 4px;
-          font-size: 0.85em;
-          transition: background 0.2s ease;
-        }
-        .prose code:not(.code-block code):hover {
-          background: ${darkMode ? 'rgba(148,163,184,0.3)' : 'rgba(148,163,184,0.25)'};
-        }
-        .prose strong {
-          font-weight: 600;
-          color: ${darkMode ? '#f8fafc' : '#1e293b'};
-        }
-        .prose a {
-          color: #3b82f6;
-          text-decoration: none;
-          transition: all 0.2s ease;
-          border-bottom: 1px solid transparent;
-        }
-        .prose a:hover {
-          color: #2563eb;
-          border-bottom-color: currentColor;
-        }
-        .prose img {
-          max-width: 100%;
-          height: auto;
-          border-radius: 8px;
-          transition: transform 0.3s ease;
-        }
-        .prose img:hover {
-          transform: scale(1.02);
-        }
-        .prose blockquote {
-          border-left: 3px solid ${darkMode ? '#334155' : '#e2e8f0'};
-          padding-left: 1.25em;
-          margin: 1em 0;
-          color: ${darkMode ? '#94a3b8' : '#475569'};
-          font-style: italic;
-          transition: border-color 0.3s ease;
-        }
-        .prose blockquote:hover {
-          border-left-color: ${darkMode ? '#64748b' : '#94a3b8'};
-        }
-        .prose hr {
-          border: none;
-          border-top: 1px solid ${darkMode ? '#334155' : '#e2e8f0'};
-          margin: 1.5em 0;
-          position: relative;
-        }
-        .prose hr::after {
-          content: "";
-          position: absolute;
-          top: -3px;
-          left: 50%;
-          transform: translateX(-50%);
-          width: 30px;
-          height: 1px;
-          background: ${darkMode ? '#64748b' : '#94a3b8'};
-        }
-      `}</style>
+  .language-tag {
+    background: ${darkMode ? '#334155' : '#e2e8f0'};
+    padding: 0.3em 0.8em;
+    border-radius: 8px;
+    font-size: 0.8em;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    transition: all 0.2s ease;
+  }
+
+  .copy-button {
+    background: transparent;
+    border: 1px solid ${darkMode ? '#475569' : '#cbd5e1'};
+    color: ${darkMode ? '#e2e8f0' : '#334155'};
+    cursor: pointer;
+    padding: 0.4em 0.8em;
+    border-radius: 8px;
+    font-size: 0.8em;
+    display: flex;
+    align-items: center;
+    gap: 0.4em;
+    transition: all 0.2s ease;
+  }
+
+  .copy-button:hover {
+    background: ${darkMode ? '#334155' : '#e2e8f0'};
+    border-color: ${darkMode ? '#64748b' : '#94a3b8'};
+    transform: translateY(-1px);
+  }
+
+  .copy-button:active {
+    transform: translateY(0);
+  }
+
+  .code-block {
+    margin: 0;
+    padding: 1em;
+    color: ${darkMode ? '#f1f5f9' : '#1e293b'};
+    overflow-x: auto;
+    font-family: 'Fira Code', 'JetBrains Mono', 'Courier New', monospace;
+    font-size: 0.9em;
+    line-height: 1.6;
+    background: ${darkMode ? '#1e293b' : '#f8fafc'};
+    scrollbar-width: thin;
+    scrollbar-color: ${darkMode ? '#475569' : '#cbd5e1'} transparent;
+  }
+
+  .code-block::-webkit-scrollbar {
+    height: 6px;
+  }
+
+  .code-block::-webkit-scrollbar-thumb {
+    background: ${darkMode ? '#475569' : '#cbd5e1'};
+    border-radius: 3px;
+  }
+
+  .code-block code {
+    font-family: inherit;
+    font-variant-ligatures: contextual;
+  }
+
+  .copy-notification {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(10px);
+    background: rgba(15,23,42,0.95);
+    color: white;
+    padding: 12px 24px;
+    border-radius: 12px;
+    font-size: 0.9em;
+    z-index: 1000;
+    animation: slideUp 0.3s ease-out forwards, fadeOut 0.5s ease-in 1.5s forwards;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+    font-weight: 500;
+  }
+
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateX(-50%) translateY(10px); }
+    to { opacity: 1; transform: translateX(-50%) translateY(0); }
+  }
+
+  @keyframes fadeOut {
+    to { opacity: 0; }
+  }
+
+  .prose {
+    max-width: 100%;
+    font-size: 0.95rem;
+    line-height: 1.7;
+    color: ${darkMode ? '#e2e8f0' : '#334155'};
+  }
+
+  .prose ul {
+    list-style-type: disc;
+    padding-left: 1.5em;
+    margin: 0.5em 0;
+  }
+
+  .prose li {
+    margin: 0.25em 0;
+  }
+
+  .prose code:not(.code-block code) {
+    background: ${darkMode ? 'rgba(148,163,184,0.2)' : 'rgba(148,163,184,0.15)'};
+    padding: 0.2em 0.4em;
+    border-radius: 4px;
+    font-size: 0.85em;
+    transition: background 0.2s ease;
+  }
+
+  .prose code:not(.code-block code):hover {
+    background: ${darkMode ? 'rgba(148,163,184,0.3)' : 'rgba(148,163,184,0.25)'};
+  }
+
+  .prose strong {
+    font-weight: 600;
+    color: ${darkMode ? '#f8fafc' : '#1e293b'};
+  }
+
+  .prose a {
+    color: #3b82f6;
+    text-decoration: none;
+    transition: all 0.2s ease;
+    border-bottom: 1px solid transparent;
+  }
+
+  .prose a:hover {
+    color: #2563eb;
+    border-bottom-color: currentColor;
+  }
+
+  .prose img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 8px;
+    transition: transform 0.3s ease;
+  }
+
+  .prose img:hover {
+    transform: scale(1.02);
+  }
+
+  .prose blockquote {
+    border-left: 3px solid ${darkMode ? '#334155' : '#e2e8f0'};
+    padding-left: 1.25em;
+    margin: 1em 0;
+    color: ${darkMode ? '#94a3b8' : '#475569'};
+    font-style: italic;
+    transition: border-color 0.3s ease;
+  }
+
+  .prose blockquote:hover {
+    border-left-color: ${darkMode ? '#64748b' : '#94a3b8'};
+  }
+
+  .prose hr {
+    border: none;
+    border-top: 1px solid ${darkMode ? '#334155' : '#e2e8f0'};
+    margin: 1.5em 0;
+    position: relative;
+  }
+
+  .prose hr::after {
+    content: "";
+    position: absolute;
+    top: -3px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 30px;
+    height: 1px;
+    background: ${darkMode ? '#64748b' : '#94a3b8'};
+  }
+`}</style>
+
     </div>
   );
 };
