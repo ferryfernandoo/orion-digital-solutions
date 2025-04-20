@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import emailjs from "emailjs-com";
 import { motion, AnimatePresence } from "framer-motion";
-import { FiUpload, FiCheckCircle, FiX, FiLoader, FiExternalLink } from "react-icons/fi";
+import { FiUpload, FiCheckCircle, FiX, FiLoader, FiExternalLink, FiChevronDown } from "react-icons/fi";
 
 const Form = () => {
   const [formData, setFormData] = useState({
@@ -20,15 +20,24 @@ const Form = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [fileName, setFileName] = useState("");
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+    return () => setIsMounted(false);
+  }, []);
 
   // Enhanced animation variants
   const containerVariants = {
-    hidden: { opacity: 0 },
+    hidden: { opacity: 0, y: -50 },
     visible: {
       opacity: 1,
+      y: 0,
       transition: {
         when: "beforeChildren",
         staggerChildren: 0.15,
+        duration: 0.8,
+        ease: [0.16, 1, 0.3, 1]
       },
     },
   };
@@ -40,8 +49,8 @@ const Form = () => {
       opacity: 1,
       transition: {
         type: "spring",
-        stiffness: 100,
-        damping: 10,
+        stiffness: 120,
+        damping: 12,
         mass: 0.5
       },
     },
@@ -54,20 +63,26 @@ const Form = () => {
       opacity: 1,
       transition: {
         type: "spring",
-        stiffness: 200,
-        damping: 20,
+        stiffness: 300,
+        damping: 25,
       },
     },
     exit: { 
       scale: 0.95, 
       opacity: 0,
-      transition: { duration: 0.2 }
+      transition: { duration: 0.3 }
     },
   };
 
   const cardHover = {
-    y: -3,
+    y: -5,
     transition: { type: "spring", stiffness: 400, damping: 10 }
+  };
+
+  const inputFocus = {
+    scale: 1.02,
+    boxShadow: "0 0 0 3px rgba(59, 130, 246, 0.5)",
+    transition: { duration: 0.2 }
   };
 
   const handleChange = (e) => {
@@ -173,52 +188,65 @@ const Form = () => {
     }
   };
 
+  if (!isMounted) return null;
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-purple-900 to-gray-800 text-white px-4 py-20">
+    <div className="min-h-screen w-full bg-gradient-to-br from-gray-900 via-purple-900 to-gray-800 text-white overflow-hidden">
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6 }}
-        className="w-full max-w-4xl mx-4"
+        initial={{ y: '-100vh', opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ 
+          type: "spring",
+          stiffness: 50,
+          damping: 15,
+          delay: 0.3
+        }}
+        className="w-full h-screen flex items-center justify-center p-4"
       >
         <motion.div
           variants={containerVariants}
           initial="hidden"
           animate="visible"
-          className="bg-gray-800 bg-opacity-60 backdrop-filter backdrop-blur-lg rounded-xl shadow-2xl overflow-hidden border border-gray-700"
+          className="w-full max-w-5xl bg-gray-800 bg-opacity-70 backdrop-filter backdrop-blur-xl rounded-2xl shadow-2xl overflow-hidden border border-gray-700"
           whileHover={{ 
-            boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.1)"
+            boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.5)"
           }}
-          transition={{ duration: 0.3 }}
+          transition={{ duration: 0.5 }}
         >
-          <div className="p-8 md:p-10">
+          <div className="p-10">
             <motion.div 
               variants={itemVariants}
-              className="mb-10"
+              className="mb-12 text-center"
             >
-              <h1 className="text-4xl font-bold mb-3 text-center bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-600">
+              <motion.h1 
+                className="text-5xl font-bold mb-4 bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-600"
+                initial={{ opacity: 0, y: -20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.4 }}
+              >
                 Join Our Team
-              </h1>
+              </motion.h1>
               <motion.p 
-                className="text-gray-400 text-center text-lg"
+                className="text-xl text-gray-400"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                transition={{ delay: 0.3 }}
+                transition={{ delay: 0.6 }}
               >
-                We're looking for talented individuals to join our growing team
+                We're looking for exceptional talent to join our mission
               </motion.p>
             </motion.div>
 
             <motion.form 
-              className="space-y-8"
+              className="space-y-10"
               variants={containerVariants}
             >
               {/* Name */}
               <motion.div 
                 variants={itemVariants}
                 whileHover={cardHover}
+                className="relative"
               >
-                <label htmlFor="name" className="block text-sm font-medium mb-3 text-gray-300">
+                <label htmlFor="name" className="block text-lg font-medium mb-3 text-gray-300">
                   Full Name <span className="text-red-500">*</span>
                 </label>
                 <motion.input
@@ -227,16 +255,13 @@ const Form = () => {
                   name="name"
                   value={formData.name}
                   onChange={handleChange}
-                  className="w-full px-5 py-3.5 bg-gray-700 border border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-300"
+                  className="w-full px-6 py-4 bg-gray-700 border-2 border-gray-600 rounded-xl focus:outline-none focus:border-blue-500 transition duration-300 text-lg"
                   placeholder="John Doe"
-                  whileFocus={{ 
-                    scale: 1.01,
-                    boxShadow: "0 0 0 2px rgba(59, 130, 246, 0.5)"
-                  }}
+                  whileFocus={inputFocus}
                 />
                 {errors.name && (
                   <motion.p 
-                    className="text-red-400 text-sm mt-2"
+                    className="absolute -bottom-6 left-0 text-red-400 text-sm"
                     initial={{ opacity: 0, y: -10 }}
                     animate={{ opacity: 1, y: 0 }}
                   >
@@ -246,12 +271,13 @@ const Form = () => {
               </motion.div>
 
               {/* Age and Phone */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
                 <motion.div 
                   variants={itemVariants}
                   whileHover={cardHover}
+                  className="relative"
                 >
-                  <label htmlFor="age" className="block text-sm font-medium mb-3 text-gray-300">
+                  <label htmlFor="age" className="block text-lg font-medium mb-3 text-gray-300">
                     Age <span className="text-red-500">*</span>
                   </label>
                   <motion.input
@@ -260,18 +286,15 @@ const Form = () => {
                     name="age"
                     value={formData.age}
                     onChange={handleChange}
-                    className="w-full px-5 py-3.5 bg-gray-700 border border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-300"
+                    className="w-full px-6 py-4 bg-gray-700 border-2 border-gray-600 rounded-xl focus:outline-none focus:border-blue-500 transition duration-300 text-lg"
                     placeholder="25"
                     min="18"
                     max="70"
-                    whileFocus={{ 
-                      scale: 1.01,
-                      boxShadow: "0 0 0 2px rgba(59, 130, 246, 0.5)"
-                    }}
+                    whileFocus={inputFocus}
                   />
                   {errors.age && (
                     <motion.p 
-                      className="text-red-400 text-sm mt-2"
+                      className="absolute -bottom-6 left-0 text-red-400 text-sm"
                       initial={{ opacity: 0, y: -10 }}
                       animate={{ opacity: 1, y: 0 }}
                     >
@@ -283,8 +306,9 @@ const Form = () => {
                 <motion.div 
                   variants={itemVariants}
                   whileHover={cardHover}
+                  className="relative"
                 >
-                  <label htmlFor="phone" className="block text-sm font-medium mb-3 text-gray-300">
+                  <label htmlFor="phone" className="block text-lg font-medium mb-3 text-gray-300">
                     WhatsApp Number <span className="text-red-500">*</span>
                   </label>
                   <motion.input
@@ -293,16 +317,13 @@ const Form = () => {
                     name="phone"
                     value={formData.phone}
                     onChange={handleChange}
-                    className="w-full px-5 py-3.5 bg-gray-700 border border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-300"
+                    className="w-full px-6 py-4 bg-gray-700 border-2 border-gray-600 rounded-xl focus:outline-none focus:border-blue-500 transition duration-300 text-lg"
                     placeholder="+6281234567890"
-                    whileFocus={{ 
-                      scale: 1.01,
-                      boxShadow: "0 0 0 2px rgba(59, 130, 246, 0.5)"
-                    }}
+                    whileFocus={inputFocus}
                   />
                   {errors.phone && (
                     <motion.p 
-                      className="text-red-400 text-sm mt-2"
+                      className="absolute -bottom-6 left-0 text-red-400 text-sm"
                       initial={{ opacity: 0, y: -10 }}
                       animate={{ opacity: 1, y: 0 }}
                     >
@@ -313,38 +334,39 @@ const Form = () => {
               </div>
 
               {/* Role and Experience */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
                 <motion.div 
                   variants={itemVariants}
                   whileHover={cardHover}
+                  className="relative"
                 >
-                  <label htmlFor="role" className="block text-sm font-medium mb-3 text-gray-300">
+                  <label htmlFor="role" className="block text-lg font-medium mb-3 text-gray-300">
                     Role in Programming <span className="text-red-500">*</span>
                   </label>
-                  <motion.select
-                    id="role"
-                    name="role"
-                    value={formData.role}
-                    onChange={handleChange}
-                    className="w-full px-5 py-3.5 bg-gray-700 border border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-300 appearance-none"
-                    whileFocus={{ 
-                      scale: 1.01,
-                      boxShadow: "0 0 0 2px rgba(59, 130, 246, 0.5)"
-                    }}
-                  >
-                    <option value="" disabled>Select your role</option>
-                    <option value="Frontend Developer">Frontend Developer</option>
-                    <option value="Backend Developer">Backend Developer</option>
-                    <option value="Fullstack Developer">Fullstack Developer</option>
-                    <option value="Mobile Developer">Mobile Developer</option>
-                    <option value="DevOps Engineer">DevOps Engineer</option>
-                    <option value="UI/UX Designer">UI/UX Designer</option>
-                    <option value="Data Scientist">Data Scientist</option>
-                    <option value="Machine Learning Engineer">Machine Learning Engineer</option>
-                  </motion.select>
+                  <div className="relative">
+                    <motion.select
+                      id="role"
+                      name="role"
+                      value={formData.role}
+                      onChange={handleChange}
+                      className="w-full px-6 py-4 bg-gray-700 border-2 border-gray-600 rounded-xl focus:outline-none focus:border-blue-500 transition duration-300 text-lg appearance-none pr-10"
+                      whileFocus={inputFocus}
+                    >
+                      <option value="" disabled>Select your role</option>
+                      <option value="Frontend Developer">Frontend Developer</option>
+                      <option value="Backend Developer">Backend Developer</option>
+                      <option value="Fullstack Developer">Fullstack Developer</option>
+                      <option value="Mobile Developer">Mobile Developer</option>
+                      <option value="DevOps Engineer">DevOps Engineer</option>
+                      <option value="UI/UX Designer">UI/UX Designer</option>
+                      <option value="Data Scientist">Data Scientist</option>
+                      <option value="Machine Learning Engineer">Machine Learning Engineer</option>
+                    </motion.select>
+                    <FiChevronDown className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 text-xl pointer-events-none" />
+                  </div>
                   {errors.role && (
                     <motion.p 
-                      className="text-red-400 text-sm mt-2"
+                      className="absolute -bottom-6 left-0 text-red-400 text-sm"
                       initial={{ opacity: 0, y: -10 }}
                       animate={{ opacity: 1, y: 0 }}
                     >
@@ -356,30 +378,31 @@ const Form = () => {
                 <motion.div 
                   variants={itemVariants}
                   whileHover={cardHover}
+                  className="relative"
                 >
-                  <label htmlFor="experience" className="block text-sm font-medium mb-3 text-gray-300">
+                  <label htmlFor="experience" className="block text-lg font-medium mb-3 text-gray-300">
                     Level of Experience <span className="text-red-500">*</span>
                   </label>
-                  <motion.select
-                    id="experience"
-                    name="experience"
-                    value={formData.experience}
-                    onChange={handleChange}
-                    className="w-full px-5 py-3.5 bg-gray-700 border border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-300 appearance-none"
-                    whileFocus={{ 
-                      scale: 1.01,
-                      boxShadow: "0 0 0 2px rgba(59, 130, 246, 0.5)"
-                    }}
-                  >
-                    <option value="" disabled>Select your experience</option>
-                    <option value="Fresh Graduate">Fresh Graduate</option>
-                    <option value="Junior (1-2 years)">Junior (1-2 years)</option>
-                    <option value="Mid-Level (3-5 years)">Mid-Level (3-5 years)</option>
-                    <option value="Senior (5+ years)">Senior (5+ years)</option>
-                  </motion.select>
+                  <div className="relative">
+                    <motion.select
+                      id="experience"
+                      name="experience"
+                      value={formData.experience}
+                      onChange={handleChange}
+                      className="w-full px-6 py-4 bg-gray-700 border-2 border-gray-600 rounded-xl focus:outline-none focus:border-blue-500 transition duration-300 text-lg appearance-none pr-10"
+                      whileFocus={inputFocus}
+                    >
+                      <option value="" disabled>Select your experience</option>
+                      <option value="Fresh Graduate">Fresh Graduate</option>
+                      <option value="Junior (1-2 years)">Junior (1-2 years)</option>
+                      <option value="Mid-Level (3-5 years)">Mid-Level (3-5 years)</option>
+                      <option value="Senior (5+ years)">Senior (5+ years)</option>
+                    </motion.select>
+                    <FiChevronDown className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 text-xl pointer-events-none" />
+                  </div>
                   {errors.experience && (
                     <motion.p 
-                      className="text-red-400 text-sm mt-2"
+                      className="absolute -bottom-6 left-0 text-red-400 text-sm"
                       initial={{ opacity: 0, y: -10 }}
                       animate={{ opacity: 1, y: 0 }}
                     >
@@ -393,8 +416,9 @@ const Form = () => {
               <motion.div 
                 variants={itemVariants}
                 whileHover={cardHover}
+                className="relative"
               >
-                <label htmlFor="motivation" className="block text-sm font-medium mb-3 text-gray-300">
+                <label htmlFor="motivation" className="block text-lg font-medium mb-3 text-gray-300">
                   What motivates you to join our team? <span className="text-red-500">*</span>
                 </label>
                 <motion.textarea
@@ -402,17 +426,13 @@ const Form = () => {
                   name="motivation"
                   value={formData.motivation}
                   onChange={handleChange}
-                  className="w-full px-5 py-3.5 bg-gray-700 border border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-300"
-                  rows="5"
+                  className="w-full px-6 py-4 bg-gray-700 border-2 border-gray-600 rounded-xl focus:outline-none focus:border-blue-500 transition duration-300 text-lg min-h-[150px]"
                   placeholder="I'm excited about the opportunity because..."
-                  whileFocus={{ 
-                    scale: 1.01,
-                    boxShadow: "0 0 0 2px rgba(59, 130, 246, 0.5)"
-                  }}
+                  whileFocus={inputFocus}
                 />
                 {errors.motivation && (
                   <motion.p 
-                    className="text-red-400 text-sm mt-2"
+                    className="absolute -bottom-6 left-0 text-red-400 text-sm"
                     initial={{ opacity: 0, y: -10 }}
                     animate={{ opacity: 1, y: 0 }}
                   >
@@ -425,8 +445,9 @@ const Form = () => {
               <motion.div 
                 variants={itemVariants}
                 whileHover={cardHover}
+                className="relative"
               >
-                <label htmlFor="portfolio" className="block text-sm font-medium mb-3 text-gray-300">
+                <label htmlFor="portfolio" className="block text-lg font-medium mb-3 text-gray-300">
                   Portfolio/LinkedIn Profile (URL) <span className="text-red-500">*</span>
                 </label>
                 <motion.input
@@ -435,16 +456,13 @@ const Form = () => {
                   name="portfolio"
                   value={formData.portfolio}
                   onChange={handleChange}
-                  className="w-full px-5 py-3.5 bg-gray-700 border border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-300"
+                  className="w-full px-6 py-4 bg-gray-700 border-2 border-gray-600 rounded-xl focus:outline-none focus:border-blue-500 transition duration-300 text-lg"
                   placeholder="https://linkedin.com/in/yourprofile"
-                  whileFocus={{ 
-                    scale: 1.01,
-                    boxShadow: "0 0 0 2px rgba(59, 130, 246, 0.5)"
-                  }}
+                  whileFocus={inputFocus}
                 />
                 {errors.portfolio && (
                   <motion.p 
-                    className="text-red-400 text-sm mt-2"
+                    className="absolute -bottom-6 left-0 text-red-400 text-sm"
                     initial={{ opacity: 0, y: -10 }}
                     animate={{ opacity: 1, y: 0 }}
                   >
@@ -457,23 +475,29 @@ const Form = () => {
               <motion.div 
                 variants={itemVariants}
                 whileHover={cardHover}
+                className="relative"
               >
-                <label htmlFor="cv" className="block text-sm font-medium mb-3 text-gray-300">
+                <label htmlFor="cv" className="block text-lg font-medium mb-3 text-gray-300">
                   Upload CV/Resume (PDF/DOCX, max 5MB) <span className="text-red-500">*</span>
                 </label>
                 <div className="flex items-center justify-center w-full">
                   <motion.label
                     htmlFor="cv"
-                    className="flex flex-col items-center justify-center w-full h-40 border-2 border-dashed border-gray-600 rounded-xl cursor-pointer bg-gray-700 hover:bg-gray-600 transition duration-300"
+                    className="flex flex-col items-center justify-center w-full h-48 border-2 border-dashed border-gray-600 rounded-xl cursor-pointer bg-gray-700 hover:bg-gray-600 transition duration-300 group"
                     whileHover={{ scale: 1.005 }}
                     whileTap={{ scale: 0.99 }}
                   >
                     <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                      <FiUpload className="w-10 h-10 mb-4 text-gray-400" />
-                      <p className="mb-2 text-sm text-gray-400">
+                      <motion.div 
+                        className="mb-4"
+                        whileHover={{ y: -3 }}
+                      >
+                        <FiUpload className="w-12 h-12 text-gray-400 group-hover:text-blue-400 transition duration-300" />
+                      </motion.div>
+                      <p className="mb-2 text-lg text-gray-400 group-hover:text-white transition duration-300">
                         <span className="font-semibold">Click to upload</span> or drag and drop
                       </p>
-                      <p className="text-xs text-gray-500">
+                      <p className="text-sm text-gray-500 group-hover:text-gray-400 transition duration-300">
                         PDF or DOCX (MAX. 5MB)
                       </p>
                     </div>
@@ -489,16 +513,17 @@ const Form = () => {
                 </div>
                 {fileName && (
                   <motion.p 
-                    className="mt-3 text-sm text-gray-300 flex items-center"
+                    className="mt-3 text-lg text-gray-300 flex items-center"
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                   >
-                    <FiCheckCircle className="text-green-500 mr-2" /> {fileName}
+                    <FiCheckCircle className="text-green-500 mr-3 animate-pulse" /> 
+                    <span className="truncate max-w-xs">{fileName}</span>
                   </motion.p>
                 )}
                 {errors.cv && (
                   <motion.p 
-                    className="text-red-400 text-sm mt-2"
+                    className="absolute -bottom-6 left-0 text-red-400 text-sm"
                     initial={{ opacity: 0, y: -10 }}
                     animate={{ opacity: 1, y: 0 }}
                   >
@@ -510,21 +535,21 @@ const Form = () => {
               {/* Submit Button */}
               <motion.div 
                 variants={itemVariants} 
-                className="pt-6"
+                className="pt-8"
               >
                 <motion.button
                   type="button"
                   onClick={handlePreview}
-                  className="w-full px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold rounded-xl hover:from-blue-700 hover:to-purple-700 transition duration-300 shadow-lg hover:shadow-blue-500/20 relative overflow-hidden"
+                  className="w-full px-10 py-5 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-bold rounded-xl hover:from-blue-700 hover:to-purple-700 transition duration-300 shadow-xl hover:shadow-blue-500/30 relative overflow-hidden text-xl"
                   whileHover={{ 
-                    scale: 1.01,
-                    boxShadow: "0 10px 25px -5px rgba(59, 130, 246, 0.4)"
+                    scale: 1.02,
+                    boxShadow: "0 15px 30px -5px rgba(59, 130, 246, 0.5)"
                   }}
-                  whileTap={{ scale: 0.99 }}
+                  whileTap={{ scale: 0.98 }}
                 >
                   <span className="relative z-10">Preview Application</span>
                   <motion.span
-                    className="absolute inset-0 bg-gradient-to-r from-blue-500 to-purple-500 opacity-0 hover:opacity-100 transition duration-300"
+                    className="absolute inset-0 bg-gradient-to-r from-blue-500 to-purple-500 opacity-0 hover:opacity-100 transition duration-500"
                     style={{ mixBlendMode: "overlay" }}
                   />
                 </motion.button>
@@ -537,21 +562,27 @@ const Form = () => {
       {/* Preview Popup */}
       <AnimatePresence>
         {showPopup && (
-          <div className="fixed inset-0 flex items-center justify-center p-4 bg-black bg-opacity-80 z-50 backdrop-blur-sm">
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.3 }}
+            className="fixed inset-0 flex items-center justify-center p-4 bg-black bg-opacity-90 backdrop-blur-lg z-50"
+          >
             <motion.div
               variants={popupVariants}
               initial="hidden"
               animate="visible"
               exit="exit"
-              className="bg-gray-800 rounded-xl shadow-2xl border border-gray-700 w-full max-w-3xl max-h-[90vh] overflow-y-auto"
+              className="w-full max-w-4xl bg-gray-800 rounded-2xl shadow-2xl border border-gray-700 max-h-[90vh] overflow-y-auto"
             >
-              <div className="p-8">
-                <div className="flex justify-between items-center mb-8">
+              <div className="p-10">
+                <div className="flex justify-between items-center mb-10">
                   <motion.h2 
-                    className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-600"
-                    initial={{ opacity: 0, y: -10 }}
+                    className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-600"
+                    initial={{ opacity: 0, y: -20 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.1 }}
+                    transition={{ delay: 0.2 }}
                   >
                     Application Preview
                   </motion.h2>
@@ -559,38 +590,55 @@ const Form = () => {
                     onClick={closePopup}
                     className="text-gray-400 hover:text-white transition duration-200"
                     disabled={isSubmitting}
-                    whileHover={{ rotate: 90 }}
+                    whileHover={{ rotate: 90, scale: 1.1 }}
                     whileTap={{ scale: 0.9 }}
                   >
-                    <FiX className="w-7 h-7" />
+                    <FiX className="w-8 h-8" />
                   </motion.button>
                 </div>
 
                 {submitSuccess ? (
                   <motion.div 
-                    className="text-center py-12"
+                    className="text-center py-16"
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
-                    transition={{ delay: 0.2 }}
+                    transition={{ delay: 0.3 }}
                   >
                     <motion.div 
-                      className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-green-500 mb-6"
+                      className="mx-auto flex items-center justify-center h-20 w-20 rounded-full bg-gradient-to-r from-green-500 to-teal-400 mb-8"
                       initial={{ scale: 0 }}
-                      animate={{ scale: 1 }}
-                      transition={{ type: "spring", stiffness: 300 }}
+                      animate={{ 
+                        scale: 1,
+                        rotate: [0, 10, -10, 0],
+                        transition: { 
+                          type: "spring",
+                          stiffness: 300,
+                          delay: 0.4
+                        }
+                      }}
                     >
-                      <FiCheckCircle className="h-8 w-8 text-white" />
+                      <FiCheckCircle className="h-10 w-10 text-white" />
                     </motion.div>
-                    <h3 className="text-2xl font-medium text-white mb-3">
+                    <motion.h3 
+                      className="text-3xl font-medium text-white mb-4"
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.6 }}
+                    >
                       Application Submitted!
-                    </h3>
-                    <p className="text-gray-400 max-w-md mx-auto">
+                    </motion.h3>
+                    <motion.p 
+                      className="text-xl text-gray-400 max-w-md mx-auto"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: 0.8 }}
+                    >
                       Thank you for your application. We'll review it and get back to you soon.
-                    </p>
+                    </motion.p>
                   </motion.div>
                 ) : (
                   <>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-10">
                       {[
                         { label: "Full Name", value: formData.name },
                         { label: "Age", value: formData.age },
@@ -607,51 +655,52 @@ const Form = () => {
                           key={index}
                           initial={{ opacity: 0, y: 20 }}
                           animate={{ opacity: 1, y: 0 }}
-                          transition={{ delay: 0.1 + index * 0.05 }}
-                          className="bg-gray-700 bg-opacity-50 p-5 rounded-lg"
+                          transition={{ delay: 0.2 + index * 0.05 }}
+                          className="bg-gray-700 bg-opacity-50 p-6 rounded-xl border border-gray-600"
                         >
-                          <h3 className="text-sm font-medium text-gray-400 mb-2">{item.label}</h3>
+                          <h3 className="text-md font-medium text-gray-400 mb-3">{item.label}</h3>
                           {item.isLink ? (
                             <a
                               href={item.value}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="text-blue-400 hover:underline flex items-center"
+                              className="text-blue-400 hover:underline flex items-center text-lg"
                             >
-                              {item.value} <FiExternalLink className="ml-1" />
+                              {item.value} <FiExternalLink className="ml-2" />
                             </a>
                           ) : (
-                            <p className="text-white">{item.value}</p>
+                            <p className="text-white text-lg">{item.value}</p>
                           )}
                         </motion.div>
                       ))}
                     </div>
 
                     <motion.div 
-                      className="mb-8 bg-gray-700 bg-opacity-50 p-5 rounded-lg"
+                      className="mb-10 bg-gray-700 bg-opacity-50 p-6 rounded-xl border border-gray-600"
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.4 }}
+                      transition={{ delay: 0.5 }}
                     >
-                      <h3 className="text-sm font-medium text-gray-400 mb-3">Motivation</h3>
-                      <p className="text-white whitespace-pre-line">{formData.motivation}</p>
+                      <h3 className="text-md font-medium text-gray-400 mb-4">Motivation</h3>
+                      <p className="text-white text-lg whitespace-pre-line">{formData.motivation}</p>
                     </motion.div>
 
                     <motion.div 
-                      className="mb-8 bg-gray-700 bg-opacity-50 p-5 rounded-lg"
+                      className="mb-10 bg-gray-700 bg-opacity-50 p-6 rounded-xl border border-gray-600"
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.45 }}
+                      transition={{ delay: 0.55 }}
                     >
-                      <h3 className="text-sm font-medium text-gray-400 mb-2">CV/Resume</h3>
-                      <p className="text-white flex items-center">
-                        <FiCheckCircle className="text-green-500 mr-2" /> {formData.cv?.name}
+                      <h3 className="text-md font-medium text-gray-400 mb-3">CV/Resume</h3>
+                      <p className="text-white text-lg flex items-center">
+                        <FiCheckCircle className="text-green-500 mr-3 animate-pulse" /> 
+                        {formData.cv?.name}
                       </p>
                     </motion.div>
 
                     {errors.submit && (
                       <motion.div 
-                        className="mb-6 p-4 bg-red-900 bg-opacity-30 rounded-lg text-red-400"
+                        className="mb-8 p-5 bg-red-900 bg-opacity-30 rounded-xl text-red-400 border border-red-700"
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                       >
@@ -659,36 +708,36 @@ const Form = () => {
                       </motion.div>
                     )}
 
-                    <div className="flex justify-end space-x-4 pt-2">
+                    <div className="flex justify-end space-x-6 pt-4">
                       <motion.button
                         onClick={closePopup}
                         disabled={isSubmitting}
-                        className="px-8 py-3 bg-gray-700 text-white rounded-xl hover:bg-gray-600 transition duration-200 flex items-center"
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.98 }}
+                        className="px-10 py-4 bg-gray-700 text-white rounded-xl hover:bg-gray-600 transition duration-200 flex items-center text-lg"
+                        whileHover={{ scale: 1.03 }}
+                        whileTap={{ scale: 0.97 }}
                       >
                         Cancel
                       </motion.button>
                       <motion.button
                         onClick={sendEmail}
                         disabled={isSubmitting}
-                        className="px-8 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl hover:from-blue-700 hover:to-purple-700 transition duration-200 flex items-center relative overflow-hidden"
+                        className="px-10 py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl hover:from-blue-700 hover:to-purple-700 transition duration-200 flex items-center text-lg relative overflow-hidden"
                         whileHover={{ 
-                          scale: 1.02,
-                          boxShadow: "0 10px 25px -5px rgba(59, 130, 246, 0.4)"
+                          scale: 1.03,
+                          boxShadow: "0 15px 30px -5px rgba(59, 130, 246, 0.5)"
                         }}
-                        whileTap={{ scale: 0.98 }}
+                        whileTap={{ scale: 0.97 }}
                       >
                         {isSubmitting ? (
                           <>
-                            <FiLoader className="animate-spin mr-2" />
+                            <FiLoader className="animate-spin mr-3" />
                             Sending...
                           </>
                         ) : (
                           <>
                             <span className="relative z-10">Submit Application</span>
                             <motion.span
-                              className="absolute inset-0 bg-gradient-to-r from-blue-500 to-purple-500 opacity-0 hover:opacity-100 transition duration-300"
+                              className="absolute inset-0 bg-gradient-to-r from-blue-500 to-purple-500 opacity-0 hover:opacity-100 transition duration-500"
                               style={{ mixBlendMode: "overlay" }}
                             />
                           </>
@@ -699,7 +748,7 @@ const Form = () => {
                 )}
               </div>
             </motion.div>
-          </div>
+          </motion.div>
         )}
       </AnimatePresence>
     </div>
