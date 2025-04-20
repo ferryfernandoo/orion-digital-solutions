@@ -8,6 +8,7 @@ import {
   FiClock, FiCpu, FiSettings, FiZap, FiStopCircle, FiMessageSquare,
   FiSun, FiMoon, FiSearch, FiDatabase, FiAward, FiChevronDown
 } from 'react-icons/fi';
+import { RiSendPlaneFill } from 'react-icons/ri';
 
 const ChatBot = () => {
   const [chatRooms, setChatRooms] = useState([]);
@@ -219,8 +220,22 @@ const ChatBot = () => {
     if (memories.length === 0) return '';
     
     try {
+      // Combine all chat histories from all rooms
+      const allChatHistories = chatRooms.flatMap(room => 
+        room.history?.map(msg => ({
+          ...msg,
+          roomId: room.id,
+          roomName: room.name
+        })) || []
+      );
+      
       const memoryTexts = memories.map(m => `[Memory ${m.date}]: ${m.summary}`).join('\n');
-      const prompt = `Daftar memori:\n${memoryTexts}\n\nPertanyaan: "${query}"\n\nIdentifikasi hanya memori yang paling relevan dengan pertanyaan (maks 20). Berikan hanya ID memori yang dipisahkan koma, atau kosong jika tidak ada yang relevan.`;
+      const chatContext = allChatHistories
+        .slice(-30) // Take last 30 messages from all rooms
+        .map(msg => `[${msg.roomName} - ${msg.role === 'user' ? 'User' : 'Orion'}]: ${msg.content}`)
+        .join('\n');
+      
+      const prompt = `Daftar memori:\n${memoryTexts}\n\nKonteks Chat Lain:\n${chatContext}\n\nPertanyaan: "${query}"\n\nIdentifikasi hanya memori yang paling relevan dengan pertanyaan (maks 20). Berikan hanya ID memori yang dipisahkan koma, atau kosong jika tidak ada yang relevan.`;
       
       const result = await model.generateContent(prompt);
       const response = await result.response.text();
@@ -275,14 +290,13 @@ const ChatBot = () => {
     for (let i = 0; i < characters.length; i++) {
       if (abortController?.signal.aborted) break;
       
-      // Add next 20 characters with slight blur
-      const chunkSize = Math.min(20, characters.length - i);
+      // Add next 5-10 characters at a time (smaller chunks for smoother typing)
+      const chunkSize = Math.min(5 + Math.floor(Math.random() * 6), characters.length - i);
       const chunk = characters.slice(i, i + chunkSize).join('');
       displayedText += chunk;
       
-      // Apply slight blur effect during typing
-      const blurredText = `<span style="filter: blur(0.3px); opacity: 0.9;">${displayedText}</span>`;
-      callback(blurredText);
+      // Update the message without any blur effect
+      callback(displayedText);
       i += chunkSize - 1;
       
       // Smooth scrolling during typing if auto-scroll is enabled
@@ -293,10 +307,9 @@ const ChatBot = () => {
       }
       
       // Random typing speed for more natural feel
-      await new Promise(resolve => setTimeout(resolve, Math.random() * 20 + 30));
+      await new Promise(resolve => setTimeout(resolve, Math.random() * 10 + 20));
     }
     
-    // Remove blur effect when done
     callback(fullText);
   };
 
@@ -427,7 +440,7 @@ const ChatBot = () => {
 
       const startTime = Date.now();
 
-      // Find relevant memories using AI
+      // Find relevant memories using AI (now includes context from all rooms)
       const relevantMemories = await findRelevantMemories(trimmedMessage);
       
       // Combine chat history into prompt
@@ -835,9 +848,11 @@ and extremely friendly and very human little bit emoticon and get straight to th
                 }}
                 className={`flex ${message.isBot ? 'justify-start' : 'justify-end'}`}
               >
-                <div className={`max-w-[90%] md:max-w-[80%] ${message.isBot ? 
-                  `${themeClasses.cardBg} ${themeClasses.border}` : 
-                  'bg-gradient-to-br from-blue-600 to-blue-500 text-white'} rounded-2xl p-3 shadow-xs`}
+                <motion.div
+                  whileHover={{ scale: 1.01 }}
+                  className={`max-w-[90%] md:max-w-[80%] ${message.isBot ? 
+                    `${themeClasses.cardBg} ${themeClasses.border}` : 
+                    'bg-gradient-to-br from-blue-600 to-blue-500 text-white'} rounded-2xl p-3 shadow-xs`}
                 >
                   {message.isBot && (
                     <div className="flex items-center mb-1">
@@ -884,7 +899,7 @@ and extremely friendly and very human little bit emoticon and get straight to th
                       </button>
                     )}
                   </div>
-                </div>
+                </motion.div>
               </motion.div>
             ))}
           </AnimatePresence>
@@ -1106,7 +1121,7 @@ and extremely friendly and very human little bit emoticon and get straight to th
                 <motion.button
                   onClick={() => handleSendMessage(inputMessage, pendingFiles)}
                   disabled={(!inputMessage.trim() && pendingFiles.length === 0) || isBotTyping}
-                  className={`p-1.5 rounded-full transition-all ${inputMessage.trim() || pendingFiles.length > 0 ? 
+                  className={`p-2 rounded-full transition-all ${inputMessage.trim() || pendingFiles.length > 0 ? 
                     'bg-gradient-to-br from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white shadow' : 
                     'text-gray-400 hover:text-gray-500 hover:bg-gray-100'}`}
                   whileHover={{ 
@@ -1116,7 +1131,7 @@ and extremely friendly and very human little bit emoticon and get straight to th
                   whileTap={{ scale: 0.9 }}
                   title="Send message"
                 >
-                  <FiSend size={16} />
+                  <RiSendPlaneFill size={18} />
                 </motion.button>
               </>
             )}
