@@ -70,7 +70,7 @@ function Navbar() {
   // Close menu when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (mobileMenuRef.current && !mobileMenuRef.current.contains(event.target) {
+      if (mobileMenuRef.current && !mobileMenuRef.current.contains(event.target)) {
         if (navRef.current && !navRef.current.contains(event.target)) {
           setIsMobileMenuOpen(false);
         }
@@ -85,6 +85,13 @@ function Navbar() {
   const handleLogoClick = () => {
     setIsMobileMenuOpen(false);
   };
+
+  const navItems = [
+    { name: "Home", path: "/" },
+    { name: "About", path: "/about" },
+    { name: "Services", path: "/services" },
+    { name: "Contact", path: "/contact" }
+  ];
 
   return (
     <motion.nav 
@@ -107,7 +114,7 @@ function Navbar() {
           >
             <motion.span
               animate={{ 
-                textShadow: ["0 0 8px rgba(96,165,250,0)", "0 0 8px rgba(96,165,250,0.5)", "0 0 8px rgba(96,165,250,0)"],
+                textShadow: ["0 0 8px rgba(96,165,250,0)", "0 0 8px rgba(96,165,250,0.5)", "0 0 8px rgba(96,165,250,0)"]
               }}
               transition={{ 
                 duration: 3,
@@ -121,7 +128,7 @@ function Navbar() {
               alt="Orion Logo" 
               className="h-10"
               animate={{
-                rotate: [0, 5, -5, 0],
+                rotate: [0, 5, -5, 0]
               }}
               transition={{
                 duration: 5,
@@ -134,17 +141,17 @@ function Navbar() {
 
         {/* Desktop Navigation */}
         <ul className="hidden md:flex space-x-8">
-          {['Home', 'About', 'Services', 'Contact'].map((item) => (
+          {navItems.map((item) => (
             <motion.li
-              key={item}
+              key={item.name}
               whileHover={navLinkHover}
               whileTap={navLinkTap}
             >
               <Link
-                to={`/${item.toLowerCase()}`}
+                to={item.path}
                 className="text-gray-300 hover:text-white text-sm font-medium tracking-wide transition"
               >
-                {item}
+                {item.name}
               </Link>
             </motion.li>
           ))}
@@ -171,7 +178,7 @@ function Navbar() {
               strokeLinejoin="round"
               strokeWidth="2"
               d="M4 6h16M4 12h16m-7 6h7"
-            ></path>
+            />
           </svg>
         </motion.button>
       </div>
@@ -188,9 +195,9 @@ function Navbar() {
             exit="closed"
           >
             <ul className="flex flex-col items-center space-y-6 py-6">
-              {['Home', 'About', 'Services', 'Contact'].map((item, index) => (
+              {navItems.map((item, index) => (
                 <motion.li
-                  key={item}
+                  key={item.name}
                   variants={navItemVariants}
                   custom={index}
                 >
@@ -199,11 +206,11 @@ function Navbar() {
                     whileTap={navLinkTap}
                   >
                     <Link
-                      to={`/${item.toLowerCase()}`}
+                      to={item.path}
                       className="text-gray-300 hover:text-white text-lg font-medium"
                       onClick={() => setIsMobileMenuOpen(false)}
                     >
-                      {item}
+                      {item.name}
                     </Link>
                   </motion.div>
                 </motion.li>
