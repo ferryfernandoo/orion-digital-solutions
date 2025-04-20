@@ -1016,169 +1016,182 @@ and extremely friendly and very human little bit emoticon and get straight to th
       )}
 
       {/* Bottom Input Container */}
-      <div className={`${themeClasses.border} ${themeClasses.bgSecondary} pt-2 pb-3 px-4`}>
-        {/* File Preview */}
-        {pendingFiles.length > 0 && (
-          <motion.div 
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            className={`flex items-center space-x-2 p-2 ${themeClasses.border} overflow-x-auto scrollbar-thin ${themeClasses.bgTertiary} rounded-t-lg`}
+<div className={`${themeClasses.border} ${themeClasses.bgSecondary} pt-2 pb-3 px-4`}>
+  
+  {/* File Preview */}
+  <AnimatePresence>
+    {pendingFiles.length > 0 && (
+      <motion.div
+        initial={{ height: 0, opacity: 0 }}
+        animate={{ height: 'auto', opacity: 1 }}
+        exit={{ height: 0, opacity: 0 }}
+        transition={{ duration: 0.3, ease: 'easeInOut' }}
+        className={`flex items-center space-x-2 p-2 ${themeClasses.border} overflow-x-auto scrollbar-thin ${themeClasses.bgTertiary} rounded-t-lg`}
+      >
+        {pendingFiles.map((file, index) => (
+          <motion.div
+            key={index}
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ delay: index * 0.05, type: "spring", stiffness: 300 }}
+            className="relative flex-shrink-0"
           >
-            {pendingFiles.map((file, index) => (
-              <motion.div 
-                key={index} 
-                initial={{ scale: 0.9, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                transition={{ delay: index * 0.05 }}
-                className="relative flex-shrink-0"
-              >
-                <div className={`w-14 h-14 flex items-center justify-center ${themeClasses.cardBg} rounded-lg ${themeClasses.border} overflow-hidden shadow-sm`}>
-                  {file.type.startsWith('image/') ? (
-                    <img 
-                      src={URL.createObjectURL(file)} 
-                      alt="Preview" 
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="p-1 text-center">
-                      <FiFile size={16} className="mx-auto" />
-                      <p className="text-xs mt-0.5 truncate w-12">{file.name.split('.')[0]}</p>
-                    </div>
-                  )}
+            <div className={`w-14 h-14 flex items-center justify-center ${themeClasses.cardBg} rounded-lg ${themeClasses.border} overflow-hidden shadow-md`}>
+              {file.type.startsWith('image/') ? (
+                <img
+                  src={URL.createObjectURL(file)}
+                  alt="Preview"
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <div className="p-1 text-center">
+                  <FiFile size={16} className="mx-auto" />
+                  <p className="text-xs mt-0.5 truncate w-12">{file.name.split('.')[0]}</p>
                 </div>
-                <button
-                  onClick={() => {
-                    const newFiles = [...pendingFiles];
-                    newFiles.splice(index, 1);
-                    setPendingFiles(newFiles);
-                  }}
-                  className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 hover:bg-red-600 transition-colors shadow"
-                >
-                  <FiX size={10} />
-                </button>
-              </motion.div>
-            ))}
+              )}
+            </div>
+            <motion.button
+              onClick={() => {
+                const newFiles = [...pendingFiles];
+                newFiles.splice(index, 1);
+                setPendingFiles(newFiles);
+              }}
+              className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 hover:bg-red-600 transition-all shadow"
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+            >
+              <FiX size={10} />
+            </motion.button>
           </motion.div>
-        )}
-        
-        {/* Main Input Area */}
-        <div className="relative">
-          <motion.textarea
-            ref={textareaRef}
-            value={inputMessage}
-            onChange={(e) => {
-              setInputMessage(e.target.value);
-              e.target.style.height = "auto";
-              e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`;
-            }}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                handleSendMessage(inputMessage, pendingFiles);
-              }
-            }}
-            placeholder="Type your message..."
-            className={`w-full ${themeClasses.inputBg} ${themeClasses.inputBorder} rounded-xl px-4 py-3 pr-12 focus:outline-none focus:border-transparent resize-none overflow-hidden transition-all duration-200 text-sm ${themeClasses.inputText}`}
-            rows={1}
-            style={{ minHeight: '48px', maxHeight: '120px' }}
-            whileFocus={{ boxShadow: '0 0 0 2px rgba(59, 130, 246, 0.5)' }}
-          />
-          
-          <div className="absolute right-2 bottom-2 flex items-center space-x-1">
-            {inputMessage && (
-              <motion.button
-                onClick={() => setInputMessage('')}
-                className={`p-1.5 rounded-full ${themeClasses.hoverBg} transition-colors`}
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.9 }}
-              >
-                <FiX size={16} />
-              </motion.button>
-            )}
-            
-            {isBotTyping ? (
-              <motion.button
-                onClick={stopGeneration}
-                className="p-1.5 rounded-full bg-red-500 hover:bg-red-600 text-white transition-colors shadow"
-                title="Stop generation"
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.9 }}
-              >
-                <FiStopCircle size={16} />
-              </motion.button>
-            ) : (
-              <>
-                <motion.button
-                  onClick={() => setShowFileOptions(!showFileOptions)}
-                  className={`p-1.5 rounded-full transition-colors ${showFileOptions ? `${themeClasses.bgTertiary}` : themeClasses.hoverBg}`}
-                  title="Attach files"
-                  whileHover={{ scale: 1.1 }}
-                  whileTap={{ scale: 0.9 }}
-                >
-                  <FiPlus size={16} />
-                </motion.button>
-                <motion.button
-                  onClick={() => handleSendMessage(inputMessage, pendingFiles)}
-                  disabled={(!inputMessage.trim() && pendingFiles.length === 0) || isBotTyping}
-                  className={`p-2 rounded-full transition-all ${inputMessage.trim() || pendingFiles.length > 0 ? 
-                    'bg-gradient-to-br from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white shadow' : 
-                    'text-gray-400 hover:text-gray-500 hover:bg-gray-100'}`}
-                  whileHover={{ 
-                    scale: (inputMessage.trim() || pendingFiles.length > 0) ? 1.1 : 1,
-                    rotate: (inputMessage.trim() || pendingFiles.length > 0) ? 5 : 0
-                  }}
-                  whileTap={{ scale: 0.9 }}
-                  title="Send message"
-                >
-                  <RiSendPlaneFill size={18} />
-                </motion.button>
-              </>
-            )}
-          </div>
-        </div>
+        ))}
+      </motion.div>
+    )}
+  </AnimatePresence>
 
-        {/* File Options */}
-        {showFileOptions && (
-          <motion.div 
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            transition={{ duration: 0.2 }}
-            className="flex space-x-2 pt-2"
+  {/* Main Input Area */}
+  <div className="relative mt-1">
+    <motion.textarea
+      ref={textareaRef}
+      value={inputMessage}
+      onChange={(e) => {
+        setInputMessage(e.target.value);
+        e.target.style.height = "auto";
+        e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`;
+      }}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          handleSendMessage(inputMessage, pendingFiles);
+        }
+      }}
+      placeholder="Type your message..."
+      className={`w-full ${themeClasses.inputBg} ${themeClasses.inputBorder} rounded-xl px-4 py-3 pr-12 focus:outline-none focus:border-transparent resize-none overflow-hidden transition-all duration-300 text-sm ${themeClasses.inputText}`}
+      rows={1}
+      style={{ minHeight: '48px', maxHeight: '120px' }}
+      whileFocus={{ boxShadow: '0 0 0 3px rgba(59,130,246,0.3)' }}
+      transition={{ type: "spring", stiffness: 100 }}
+    />
+
+    <div className="absolute right-2 bottom-2 flex items-center space-x-1">
+      {inputMessage && (
+        <motion.button
+          onClick={() => setInputMessage('')}
+          className={`p-1.5 rounded-full ${themeClasses.hoverBg} transition-all`}
+          whileHover={{ scale: 1.2 }}
+          whileTap={{ scale: 0.9 }}
+        >
+          <FiX size={16} />
+        </motion.button>
+      )}
+
+      {isBotTyping ? (
+        <motion.button
+          onClick={stopGeneration}
+          className="p-1.5 rounded-full bg-red-500 hover:bg-red-600 text-white transition-all shadow"
+          title="Stop generation"
+          whileHover={{ scale: 1.2 }}
+          whileTap={{ scale: 0.9 }}
+        >
+          <FiStopCircle size={16} />
+        </motion.button>
+      ) : (
+        <>
+          <motion.button
+            onClick={() => setShowFileOptions(!showFileOptions)}
+            className={`p-1.5 rounded-full transition-all ${showFileOptions ? `${themeClasses.bgTertiary}` : themeClasses.hoverBg}`}
+            title="Attach files"
+            whileHover={{ scale: 1.2 }}
+            whileTap={{ scale: 0.9 }}
           >
-            <motion.label 
-              className={`cursor-pointer p-2 rounded-lg transition-colors ${themeClasses.hoverBg}`}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              title="Upload image"
-            >
-              <input
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={handleFileUpload}
-                multiple
-              />
-              <FiImage size={18} />
-            </motion.label>
-            <motion.label 
-              className={`cursor-pointer p-2 rounded-lg transition-colors ${themeClasses.hoverBg}`}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              title="Upload file"
-            >
-              <input
-                type="file"
-                className="hidden"
-                onChange={handleFileUpload}
-                multiple
-              />
-              <FiFile size={18} />
-            </motion.label>
-          </motion.div>
-        )}
-      </div>
+            <FiPlus size={16} />
+          </motion.button>
+
+          <motion.button
+            onClick={() => handleSendMessage(inputMessage, pendingFiles)}
+            disabled={(!inputMessage.trim() && pendingFiles.length === 0) || isBotTyping}
+            className={`p-2 rounded-full transition-all duration-300 ${
+              inputMessage.trim() || pendingFiles.length > 0
+                ? 'bg-gradient-to-br from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white shadow-md'
+                : 'text-gray-400 hover:text-gray-500 hover:bg-gray-100'
+            }`}
+            whileHover={{
+              scale: (inputMessage.trim() || pendingFiles.length > 0) ? 1.15 : 1,
+              rotate: (inputMessage.trim() || pendingFiles.length > 0) ? 6 : 0
+            }}
+            whileTap={{ scale: 0.9 }}
+            title="Send message"
+          >
+            <RiSendPlaneFill size={18} />
+          </motion.button>
+        </>
+      )}
+    </div>
+  </div>
+
+  {/* File Options */}
+  <AnimatePresence>
+    {showFileOptions && (
+      <motion.div
+        initial={{ opacity: 0, height: 0 }}
+        animate={{ opacity: 1, height: 'auto' }}
+        exit={{ opacity: 0, height: 0 }}
+        transition={{ duration: 0.25 }}
+        className="flex space-x-2 pt-2"
+      >
+        <motion.label
+          className={`cursor-pointer p-2 rounded-lg transition-all ${themeClasses.hoverBg}`}
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.95 }}
+          title="Upload image"
+        >
+          <input
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handleFileUpload}
+            multiple
+          />
+          <FiImage size={18} />
+        </motion.label>
+        <motion.label
+          className={`cursor-pointer p-2 rounded-lg transition-all ${themeClasses.hoverBg}`}
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.95 }}
+          title="Upload file"
+        >
+          <input
+            type="file"
+            className="hidden"
+            onChange={handleFileUpload}
+            multiple
+          />
+          <FiFile size={18} />
+        </motion.label>
+      </motion.div>
+    )}
+  </AnimatePresence>
+</div>
+
       
       <style jsx global>{`
         /* Typing Dot */
