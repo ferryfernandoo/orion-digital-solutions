@@ -4,122 +4,160 @@ import { motion, AnimatePresence } from "framer-motion";
 
 function Navbar() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const mobileMenuRef = useRef(null); // Ref untuk menu mobile
+  const mobileMenuRef = useRef(null);
+  const navRef = useRef(null);
 
-  // Variants untuk animasi menu mobile
+  // Animation variants
   const mobileMenuVariants = {
-    open: { opacity: 1, y: 0 },
-    closed: { opacity: 0, y: "-100%" }
+    open: { 
+      opacity: 1,
+      y: 0,
+      transition: { 
+        type: "spring", 
+        stiffness: 300,
+        damping: 25,
+        when: "beforeChildren",
+        staggerChildren: 0.1
+      }
+    },
+    closed: { 
+      opacity: 0,
+      y: "-100%",
+      transition: { 
+        type: "spring", 
+        stiffness: 300,
+        damping: 30,
+        when: "afterChildren"
+      } 
+    }
   };
 
-  // Variants untuk animasi tombol hamburger
+  const navItemVariants = {
+    open: { 
+      opacity: 1,
+      y: 0,
+      transition: { type: "spring", stiffness: 300 }
+    },
+    closed: { 
+      opacity: 0,
+      y: -20,
+      transition: { duration: 0.2 } 
+    }
+  };
+
   const hamburgerVariants = {
-    open: { rotate: 90 },
-    closed: { rotate: 0 }
+    open: { 
+      rotate: 90,
+      transition: { type: "spring", stiffness: 400, damping: 20 }
+    },
+    closed: { 
+      rotate: 0,
+      transition: { type: "spring", stiffness: 400, damping: 20 }
+    }
   };
 
-  // Variants untuk animasi link
-  const navLinkVariants = {
-    hover: { scale: 1.1, color: "#ffffff" },
-    tap: { scale: 0.9 }
+  const navLinkHover = {
+    scale: 1.05,
+    color: "#ffffff",
+    transition: { type: "spring", stiffness: 400 }
   };
 
-  // Fungsi untuk menutup menu mobile saat klik di luar
+  const navLinkTap = {
+    scale: 0.95,
+    transition: { type: "spring", stiffness: 400 }
+  };
+
+  // Close menu when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (mobileMenuRef.current && !mobileMenuRef.current.contains(event.target)) {
-        setIsMobileMenuOpen(false);
+      if (mobileMenuRef.current && !mobileMenuRef.current.contains(event.target) {
+        if (navRef.current && !navRef.current.contains(event.target)) {
+          setIsMobileMenuOpen(false);
+        }
       }
     };
 
-    // Tambahkan event listener saat komponen mount
     document.addEventListener("mousedown", handleClickOutside);
-
-    // Bersihkan event listener saat komponen unmount
-    return () => {
-      document.removeEventListener("mousedown", handleClickOutside);
-    };
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  return (
-    <nav className="fixed w-full z-50 bg-black bg-opacity-70 backdrop-blur-md shadow-lg h-20">
-      <div className="container mx-auto px-4 flex justify-between items-center h-full">
-        {/* Logo dengan Teks dan Gambar */}
-        <Link to="/" className="text-2xl font-bold text-white hover:text-gray-300 transition duration-300 flex items-center space-x-3">
-          <span>Orion</span>
-          <img 
-            src="/orion.png" 
-            alt="Orion Logo" 
-            className="h-12" 
-          />
-        </Link>
+  // Close menu when logo is clicked
+  const handleLogoClick = () => {
+    setIsMobileMenuOpen(false);
+  };
 
-        {/* Navigation Links (Desktop) */}
-        <ul className="hidden md:flex space-x-6">
-          <li>
-            <motion.div
-              variants={navLinkVariants}
-              whileHover="hover"
-              whileTap="tap"
+  return (
+    <motion.nav 
+      ref={navRef}
+      className="fixed w-full z-50 bg-black bg-opacity-50 backdrop-blur-sm shadow-sm h-16"
+      initial={{ y: -100 }}
+      animate={{ y: 0 }}
+      transition={{ type: "spring", stiffness: 300, damping: 20 }}
+    >
+      <div className="container mx-auto px-4 flex justify-between items-center h-full">
+        {/* Logo with Click Handler */}
+        <motion.div
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+        >
+          <Link 
+            to="/" 
+            className="text-2xl font-bold text-white hover:text-gray-300 transition flex items-center space-x-2"
+            onClick={handleLogoClick}
+          >
+            <motion.span
+              animate={{ 
+                textShadow: ["0 0 8px rgba(96,165,250,0)", "0 0 8px rgba(96,165,250,0.5)", "0 0 8px rgba(96,165,250,0)"],
+              }}
+              transition={{ 
+                duration: 3,
+                repeat: Infinity 
+              }}
+            >
+              Orion
+            </motion.span>
+            <motion.img 
+              src="/orion.png" 
+              alt="Orion Logo" 
+              className="h-10"
+              animate={{
+                rotate: [0, 5, -5, 0],
+              }}
+              transition={{
+                duration: 5,
+                repeat: Infinity,
+                repeatDelay: 3
+              }}
+            />
+          </Link>
+        </motion.div>
+
+        {/* Desktop Navigation */}
+        <ul className="hidden md:flex space-x-8">
+          {['Home', 'About', 'Services', 'Contact'].map((item) => (
+            <motion.li
+              key={item}
+              whileHover={navLinkHover}
+              whileTap={navLinkTap}
             >
               <Link
-                to="/"
-                className="text-gray-300 hover:text-white transition duration-300"
+                to={`/${item.toLowerCase()}`}
+                className="text-gray-300 hover:text-white text-sm font-medium tracking-wide transition"
               >
-                Home
+                {item}
               </Link>
-            </motion.div>
-          </li>
-          <li>
-            <motion.div
-              variants={navLinkVariants}
-              whileHover="hover"
-              whileTap="tap"
-            >
-              <Link
-                to="/about"
-                className="text-gray-300 hover:text-white transition duration-300"
-              >
-                About
-              </Link>
-            </motion.div>
-          </li>
-          <li>
-            <motion.div
-              variants={navLinkVariants}
-              whileHover="hover"
-              whileTap="tap"
-            >
-              <Link
-                to="/services"
-                className="text-gray-300 hover:text-white transition duration-300"
-              >
-                Services
-              </Link>
-            </motion.div>
-          </li>
-          <li>
-            <motion.div
-              variants={navLinkVariants}
-              whileHover="hover"
-              whileTap="tap"
-            >
-              <Link
-                to="/contact"
-                className="text-gray-300 hover:text-white transition duration-300"
-              >
-                Contact
-              </Link>
-            </motion.div>
-          </li>
+            </motion.li>
+          ))}
         </ul>
 
-        {/* Hamburger Menu Button (Mobile) */}
+        {/* Mobile Menu Button */}
         <motion.button 
           className="md:hidden text-white focus:outline-none"
           onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
           variants={hamburgerVariants}
           animate={isMobileMenuOpen ? "open" : "closed"}
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.9 }}
         >
           <svg
             className="w-6 h-6"
@@ -138,84 +176,43 @@ function Navbar() {
         </motion.button>
       </div>
 
-      {/* Mobile Menu (Muncul saat diklik) */}
+      {/* Mobile Menu */}
       <AnimatePresence>
         {isMobileMenuOpen && (
           <motion.div
-            ref={mobileMenuRef} // Ref untuk mendeteksi klik di luar
-            className="md:hidden fixed top-20 left-0 w-full bg-black bg-opacity-90 backdrop-blur-md shadow-lg"
+            ref={mobileMenuRef}
+            className="md:hidden fixed top-16 left-0 w-full bg-black bg-opacity-95 backdrop-blur-lg"
             variants={mobileMenuVariants}
             initial="closed"
             animate="open"
             exit="closed"
-            transition={{ type: "spring", stiffness: 100, damping: 20 }}
           >
-            <ul className="flex flex-col items-center space-y-4 py-4">
-              <li>
-                <motion.div
-                  variants={navLinkVariants}
-                  whileHover="hover"
-                  whileTap="tap"
+            <ul className="flex flex-col items-center space-y-6 py-6">
+              {['Home', 'About', 'Services', 'Contact'].map((item, index) => (
+                <motion.li
+                  key={item}
+                  variants={navItemVariants}
+                  custom={index}
                 >
-                  <Link
-                    to="/"
-                    className="text-gray-300 hover:text-white transition duration-300"
-                    onClick={() => setIsMobileMenuOpen(false)}
+                  <motion.div
+                    whileHover={navLinkHover}
+                    whileTap={navLinkTap}
                   >
-                    Home
-                  </Link>
-                </motion.div>
-              </li>
-              <li>
-                <motion.div
-                  variants={navLinkVariants}
-                  whileHover="hover"
-                  whileTap="tap"
-                >
-                  <Link
-                    to="/about"
-                    className="text-gray-300 hover:text-white transition duration-300"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                  >
-                    About
-                  </Link>
-                </motion.div>
-              </li>
-              <li>
-                <motion.div
-                  variants={navLinkVariants}
-                  whileHover="hover"
-                  whileTap="tap"
-                >
-                  <Link
-                    to="/services"
-                    className="text-gray-300 hover:text-white transition duration-300"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                  >
-                    Services
-                  </Link>
-                </motion.div>
-              </li>
-              <li>
-                <motion.div
-                  variants={navLinkVariants}
-                  whileHover="hover"
-                  whileTap="tap"
-                >
-                  <Link
-                    to="/contact"
-                    className="text-gray-300 hover:text-white transition duration-300"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                  >
-                    Contact
-                  </Link>
-                </motion.div>
-              </li>
+                    <Link
+                      to={`/${item.toLowerCase()}`}
+                      className="text-gray-300 hover:text-white text-lg font-medium"
+                      onClick={() => setIsMobileMenuOpen(false)}
+                    >
+                      {item}
+                    </Link>
+                  </motion.div>
+                </motion.li>
+              ))}
             </ul>
           </motion.div>
         )}
       </AnimatePresence>
-    </nav>
+    </motion.nav>
   );
 }
 
