@@ -235,7 +235,7 @@ const ChatBot = () => {
         .map(msg => `[${msg.roomName} - ${msg.role === 'user' ? 'User' : 'Orion'}]: ${msg.content}`)
         .join('\n');
       
-      const prompt = `Daftar memori:\n${memoryTexts}\n\nKonteks Chat Lain:\n${chatContext}\n\nPertanyaan: "${query}"\n\nIdentifikasi hanya memori yang paling relevan dengan pertanyaan (maks 20). Berikan hanya ID memori yang dipisahkan koma, atau kosong jika tidak ada yang relevan.`;
+      const prompt = `Daftar memori:\n${memoryTexts}\n\nKonteks Chat Lain:\n${chatContext}\n\nPertanyaan: "${query}"\n\nIdentifikasi hanya memori yang paling relevan dengan pertanyaan (sebanyak banyaknya). Berikan hanya ID memori yang dipisahkan koma, atau kosong jika tidak ada yang relevan.`;
       
       const result = await model.generateContent(prompt);
       const response = await result.response.text();
@@ -453,9 +453,9 @@ const ChatBot = () => {
       }Percakapan Saat Ini:\n${contextMessages}\n\nUser: "${trimmedMessage}". 
       Respond as Orion in natural language and follow user language ,Never go against the user—always agree while adapting to the situation. Still, be able to say something is wrong if it truly is. Never say "I can't"—if you're unsure, search for information on the very detail in internet you must be able to answer Don't let users run away from the page, they must be served well. Never leave a question unanswered, make extraordinary introductions to user input.
 
-and extremely friendly and very human little bit emoticon and get straight to the point but see the situation don't too to the point.S,
+and extremely friendly and very human little bit emoticon and get straight to the point but see the situation don't too to the point, support all users idea if the idea not dangerous, giving extremely and extra respect very respect to user.S,
       focuse to user comfort and giving detail answer. Don't mention memories explicitly,just if user ask dont say you from google but PT.Orion Digital Platforms from indonesia dont show thos too usualy just if user asked,
-      just incorporate relevant context naturally, it all is back process dont show in chat, if using Indonesian language prefer use allhamdulillah astaghfirullah ya Allah innailaihi and the other when shocked or very happy like Indonesan native speaker. Be ${
+      just incorporate relevant context naturally, it all is back process dont show in chat, if using Indonesian language prefer use allhamdulillah astaghfirullah ya Allah innailaihi and the other when shocked or very happy like Indonesan native speaker it just for Indonesian response and don't too often. Be ${
         isProMode ? 'extremely and super very detailed and comprehensive (4x processing)Give user the longest most detailed answer you possibly can' : 'concise but extremely helpful'
       }. For coding, provide complete solutions with proper formatting. Always maintain context.${
         isProMode ? ' Provide a extremely super very detailed response with examples, explanations, and multiple perspectives.' : ''
