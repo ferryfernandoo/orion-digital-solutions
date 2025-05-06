@@ -6,9 +6,71 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { 
   FiCopy, FiSend, FiPlus, FiX, FiImage, FiFile, FiTrash2, 
   FiClock, FiCpu, FiSettings, FiZap, FiStopCircle, FiMessageSquare,
-  FiSun, FiMoon, FiSearch, FiDatabase, FiAward, FiChevronDown
+  FiSun, FiMoon, FiSearch, FiDatabase, FiAward, FiChevronDown, FiGlobe
 } from 'react-icons/fi';
 import { RiSendPlaneFill } from 'react-icons/ri';
+
+// Web search utility functions
+const performWebSearch = async (query) => {
+  try {
+    // Use a free search API or scraping approach
+    const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
+    
+    // Note: In a real app, you would need a proxy server to avoid CORS issues
+    // This is a simplified example that would need proper backend implementation
+    const response = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(searchUrl)}`);
+    const data = await response.json();
+    
+    // Parse the HTML to extract relevant information (simplified)
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(data.contents, 'text/html');
+    
+    // Extract titles and URLs from search results
+    const results = Array.from(doc.querySelectorAll('div.g')).map((result, index) => {
+      const title = result.querySelector('h3')?.textContent || `Result ${index + 1}`;
+      const url = result.querySelector('a')?.href || '#';
+      const snippet = result.querySelector('.IsZvec')?.textContent || 'No description available';
+      
+      return {
+        title,
+        url,
+        snippet
+      };
+    }).slice(0, 5); // Limit to top 5 results
+    
+    return results;
+  } catch (error) {
+    console.error("Error performing web search:", error);
+    return [];
+  }
+};
+
+const scrapeWebsiteContent = async (url) => {
+  try {
+    // Note: This would require a backend service in production due to CORS
+    const response = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(url)}`);
+    const data = await response.json();
+    
+    // Extract main content (simplified)
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(data.contents, 'text/html');
+    
+    // Remove scripts, styles, and unnecessary elements
+    const unwantedElements = doc.querySelectorAll('script, style, nav, footer, iframe');
+    unwantedElements.forEach(el => el.remove());
+    
+    // Get text content with some basic formatting
+    const mainContent = doc.body.textContent
+      .replace(/\s+/g, ' ')
+      .trim()
+      .substring(0, 5000); // Limit to first 5000 characters
+    
+    return mainContent;
+  } catch (error) {
+    console.error("Error scraping website:", error);
+    return "Could not retrieve website content";
+  }
+};
 
 const ChatBot = () => {
   const [chatRooms, setChatRooms] = useState([]);
@@ -30,6 +92,7 @@ const ChatBot = () => {
   const [processingSources, setProcessingSources] = useState([]);
   const [autoScroll, setAutoScroll] = useState(true);
   const [showScrollButton, setShowScrollButton] = useState(false);
+  const [searchMode, setSearchMode] = useState(false); // 'none', 'shallow', 'deep'
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
   const chatContainerRef = useRef(null);
@@ -137,6 +200,7 @@ const ChatBot = () => {
     setInputMessage('');
     setShowTemplateButtons(true);
     messageCountRef.current = 0;
+    setSearchMode(false);
     
     localStorage.setItem('orionChatRooms', JSON.stringify([newRoom, ...chatRooms]));
     localStorage.setItem('orionCurrentRoom', JSON.stringify(newRoom.id));
@@ -151,6 +215,7 @@ const ChatBot = () => {
       setShowTemplateButtons(room.messages.length === 0);
       setShowChatHistory(false);
       setAutoScroll(true);
+      setSearchMode(false);
       setTimeout(() => smoothScrollToBottom(), 50);
     }
   };
@@ -371,6 +436,74 @@ const ChatBot = () => {
     setProcessingSources([]);
   };
 
+  const performWebResearch = async (query) => {
+    try {
+      // Step 1: Perform initial web search
+      setProcessingSources(prev => [
+        ...prev,
+        {
+          id: 'search-step-1',
+          text: 'Performing web search',
+          icon: <FiGlobe />,
+          completed: false
+        }
+      ]);
+      
+      const searchResults = await performWebSearch(query);
+      
+      // Step 2: Scrape content from top results
+      setProcessingSources(prev => [
+        ...prev,
+        {
+          id: 'search-step-2',
+          text: 'Analyzing top results',
+          icon: <FiSearch />,
+          completed: false
+        }
+      ]);
+      
+      const scrapedContents = await Promise.all(
+        searchResults.slice(0, 3).map(async (result) => {
+          const content = await scrapeWebsiteContent(result.url);
+          return {
+            title: result.title,
+            url: result.url,
+            content
+          };
+        })
+      );
+      
+      // Step 3: Summarize findings
+      setProcessingSources(prev => [
+        ...prev,
+        {
+          id: 'search-step-3',
+          text: 'Summarizing findings',
+          icon: <FiDatabase />,
+          completed: false
+        }
+      ]);
+      
+      const researchSummary = scrapedContents
+        .map(r => `[Source: ${r.title} (${r.url})]\n${r.content.substring(0, 1000)}...`)
+        .join('\n\n');
+      
+      // Update processing sources
+      setProcessingSources(prev => 
+        prev.map(source => 
+          source.id.startsWith('search-step') 
+            ? { ...source, completed: true, text: source.text + ' (completed)' } 
+            : source
+        )
+      );
+      
+      return researchSummary;
+    } catch (error) {
+      console.error("Error performing web research:", error);
+      return "Could not complete web research due to an error";
+    }
+  };
+
   const handleSendMessage = async (messageText, files = []) => {
     const trimmedMessage = messageText.trim();
     if ((!trimmedMessage && files.length === 0) || isBotTyping) return;
@@ -448,8 +581,21 @@ const ChatBot = () => {
         return msg.role === 'user' ? `User: ${msg.content}` : `Orion: ${msg.content}`;
       }).join('\n');
 
+      // Perform web research if in deep search mode
+      let webResearchContent = '';
+      if (searchMode === 'deep') {
+        webResearchContent = await performWebResearch(trimmedMessage);
+      } else if (searchMode === 'shallow') {
+        const searchResults = await performWebSearch(trimmedMessage);
+        webResearchContent = searchResults
+          .map(r => `[${r.title}](${r.url})\n${r.snippet}`)
+          .join('\n\n');
+      }
+
       const fullPrompt = `${
         relevantMemories ? `Konteks Memori Relevan:\n${relevantMemories}\n\n` : ''
+      }${
+        webResearchContent ? `Hasil Penelusuran Web:\n${webResearchContent}\n\n` : ''
       }Percakapan Saat Ini:\n${contextMessages}\n\nUser: "${trimmedMessage}". 
       Respond as Orion in natural language and follow user language ,Never go against the user—always agree while adapting to the situation. Still, be able to say something is wrong if it truly is. Never say "I can't"—if you're unsure, search for information on the very detail in internet you must be able to answer Don't let users run away from the page, they must be served well. Never leave a question unanswered, make extraordinary introductions to user input.
 
@@ -459,6 +605,8 @@ and extremely friendly and very human little bit emoticon and get straight to th
         isProMode ? 'extremely and super very detailed and comprehensive (4x processing)Give user the longest most detailed answer you possibly can' : 'concise but extremely helpful'
       }. For coding, provide complete solutions with proper formatting. Always maintain context.${
         isProMode ? ' Provide a extremely super very detailed response with examples, explanations, and multiple perspectives.' : ''
+      }${
+        webResearchContent ? '\n\nNote: Incorporate web research results naturally into your response.' : ''
       }`;
 
       let botResponse;
@@ -526,7 +674,7 @@ and extremely friendly and very human little bit emoticon and get straight to th
     const withLists = text.replace(/^\s*[\*\-+]\s+(.+)/gm, '<li>$1</li>')
       .replace(/(<li>.*<\/li>)+/g, (match) => `<ul>${match}</ul>`);
     
-    // Process code blocks
+    // Process code blocks with language detection
     const codeBlockRegex = /```(\w+)?\n([\s\S]*?)\n```/g;
     const withCodeBlocks = withLists.replace(codeBlockRegex, (match, language, code) => {
       const cleanCode = code.replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -537,7 +685,7 @@ and extremely friendly and very human little bit emoticon and get straight to th
             <FiCopy /> Copy
           </button>
         </div>
-        <pre class="code-block" contenteditable="true" spellcheck="false"><code>${cleanCode}</code></pre>
+        <pre class="code-block" contenteditable="true" spellcheck="false"><code class="language-${language || 'plaintext'}">${cleanCode}</code></pre>
       </div>`;
     });
 
@@ -581,6 +729,14 @@ and extremely friendly and very human little bit emoticon and get straight to th
     const newProMode = !isProMode;
     setIsProMode(newProMode);
     localStorage.setItem('orionProMode', newProMode.toString());
+  };
+
+  const toggleSearchMode = () => {
+    setSearchMode(prev => {
+      if (prev === false) return 'shallow';
+      if (prev === 'shallow') return 'deep';
+      return false;
+    });
   };
 
   // Theme classes
@@ -1016,182 +1172,222 @@ and extremely friendly and very human little bit emoticon and get straight to th
       )}
 
       {/* Bottom Input Container */}
-<div className={`${themeClasses.border} ${themeClasses.bgSecondary} pt-2 pb-3 px-4`}>
-  
-  {/* File Preview */}
-  <AnimatePresence>
-    {pendingFiles.length > 0 && (
-      <motion.div
-        initial={{ height: 0, opacity: 0 }}
-        animate={{ height: 'auto', opacity: 1 }}
-        exit={{ height: 0, opacity: 0 }}
-        transition={{ duration: 0.3, ease: 'easeInOut' }}
-        className={`flex items-center space-x-2 p-2 ${themeClasses.border} overflow-x-auto scrollbar-thin ${themeClasses.bgTertiary} rounded-t-lg`}
-      >
-        {pendingFiles.map((file, index) => (
-          <motion.div
-            key={index}
-            initial={{ scale: 0.8, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ delay: index * 0.05, type: "spring", stiffness: 300 }}
-            className="relative flex-shrink-0"
-          >
-            <div className={`w-14 h-14 flex items-center justify-center ${themeClasses.cardBg} rounded-lg ${themeClasses.border} overflow-hidden shadow-md`}>
-              {file.type.startsWith('image/') ? (
-                <img
-                  src={URL.createObjectURL(file)}
-                  alt="Preview"
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <div className="p-1 text-center">
-                  <FiFile size={16} className="mx-auto" />
-                  <p className="text-xs mt-0.5 truncate w-12">{file.name.split('.')[0]}</p>
-                </div>
-              )}
-            </div>
+      <div className={`${themeClasses.border} ${themeClasses.bgSecondary} pt-2 pb-3 px-4`}>
+        
+        {/* File Preview */}
+        <AnimatePresence>
+          {pendingFiles.length > 0 && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.3, ease: 'easeInOut' }}
+              className={`flex items-center space-x-2 p-2 ${themeClasses.border} overflow-x-auto scrollbar-thin ${themeClasses.bgTertiary} rounded-t-lg`}
+            >
+              {pendingFiles.map((file, index) => (
+                <motion.div
+                  key={index}
+                  initial={{ scale: 0.8, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ delay: index * 0.05, type: "spring", stiffness: 300 }}
+                  className="relative flex-shrink-0"
+                >
+                  <div className={`w-14 h-14 flex items-center justify-center ${themeClasses.cardBg} rounded-lg ${themeClasses.border} overflow-hidden shadow-md`}>
+                    {file.type.startsWith('image/') ? (
+                      <img
+                        src={URL.createObjectURL(file)}
+                        alt="Preview"
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="p-1 text-center">
+                        <FiFile size={16} className="mx-auto" />
+                        <p className="text-xs mt-0.5 truncate w-12">{file.name.split('.')[0]}</p>
+                      </div>
+                    )}
+                  </div>
+                  <motion.button
+                    onClick={() => {
+                      const newFiles = [...pendingFiles];
+                      newFiles.splice(index, 1);
+                      setPendingFiles(newFiles);
+                    }}
+                    className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 hover:bg-red-600 transition-all shadow"
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.9 }}
+                  >
+                    <FiX size={10} />
+                  </motion.button>
+                </motion.div>
+              ))}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Search Mode Indicator */}
+        {searchMode && (
+          <div className={`text-xs px-3 py-1 mb-1 rounded-full inline-flex items-center ${searchMode === 'deep' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'}`}>
+            <FiGlobe size={12} className="mr-1" />
+            {searchMode === 'deep' ? 'Deep Web Search' : 'Web Search'} enabled
+            <button 
+              onClick={() => setSearchMode(false)}
+              className="ml-2 text-current hover:text-red-500"
+            >
+              <FiX size={12} />
+            </button>
+          </div>
+        )}
+
+        {/* Main Input Area */}
+        <div className="relative mt-1">
+          <motion.textarea
+            ref={textareaRef}
+            value={inputMessage}
+            onChange={(e) => {
+              setInputMessage(e.target.value);
+              e.target.style.height = "auto";
+              e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`;
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleSendMessage(inputMessage, pendingFiles);
+              }
+            }}
+            placeholder="Type your message..."
+            className={`w-full ${themeClasses.inputBg} ${themeClasses.inputBorder} rounded-xl px-4 py-3 pr-12 focus:outline-none focus:border-transparent resize-none overflow-hidden transition-all duration-300 text-sm ${themeClasses.inputText}`}
+            rows={1}
+            style={{ minHeight: '48px', maxHeight: '120px' }}
+            whileFocus={{ boxShadow: '0 0 0 3px rgba(59,130,246,0.3)' }}
+            transition={{ type: "spring", stiffness: 100 }}
+          />
+
+          <div className="absolute right-2 bottom-2 flex items-center space-x-1">
+            {inputMessage && (
+              <motion.button
+                onClick={() => setInputMessage('')}
+                className={`p-1.5 rounded-full ${themeClasses.hoverBg} transition-all`}
+                whileHover={{ scale: 1.2 }}
+                whileTap={{ scale: 0.9 }}
+              >
+                <FiX size={16} />
+              </motion.button>
+            )}
+
             <motion.button
-              onClick={() => {
-                const newFiles = [...pendingFiles];
-                newFiles.splice(index, 1);
-                setPendingFiles(newFiles);
-              }}
-              className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 hover:bg-red-600 transition-all shadow"
-              whileHover={{ scale: 1.1 }}
+              onClick={toggleSearchMode}
+              className={`p-1.5 rounded-full transition-all ${
+                searchMode === 'deep' ? 'bg-purple-500 text-white' : 
+                searchMode === 'shallow' ? 'bg-blue-500 text-white' : 
+                themeClasses.hoverBg
+              }`}
+              title={searchMode ? `Search mode: ${searchMode}` : 'Enable web search'}
+              whileHover={{ scale: 1.2 }}
               whileTap={{ scale: 0.9 }}
             >
-              <FiX size={10} />
+              <FiGlobe size={16} />
             </motion.button>
-          </motion.div>
-        ))}
-      </motion.div>
-    )}
-  </AnimatePresence>
 
-  {/* Main Input Area */}
-  <div className="relative mt-1">
-    <motion.textarea
-      ref={textareaRef}
-      value={inputMessage}
-      onChange={(e) => {
-        setInputMessage(e.target.value);
-        e.target.style.height = "auto";
-        e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`;
-      }}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-          e.preventDefault();
-          handleSendMessage(inputMessage, pendingFiles);
-        }
-      }}
-      placeholder="Type your message..."
-      className={`w-full ${themeClasses.inputBg} ${themeClasses.inputBorder} rounded-xl px-4 py-3 pr-12 focus:outline-none focus:border-transparent resize-none overflow-hidden transition-all duration-300 text-sm ${themeClasses.inputText}`}
-      rows={1}
-      style={{ minHeight: '48px', maxHeight: '120px' }}
-      whileFocus={{ boxShadow: '0 0 0 3px rgba(59,130,246,0.3)' }}
-      transition={{ type: "spring", stiffness: 100 }}
-    />
+            {isBotTyping ? (
+              <motion.button
+                onClick={stopGeneration}
+                className="p-1.5 rounded-full bg-red-500 hover:bg-red-600 text-white transition-all shadow"
+                title="Stop generation"
+                whileHover={{ scale: 1.2 }}
+                whileTap={{ scale: 0.9 }}
+              >
+                <FiStopCircle size={16} />
+              </motion.button>
+            ) : (
+              <>
+                <motion.button
+                  onClick={() => setShowFileOptions(!showFileOptions)}
+                  className={`p-1.5 rounded-full transition-all ${showFileOptions ? `${themeClasses.bgTertiary}` : themeClasses.hoverBg}`}
+                  title="Attach files"
+                  whileHover={{ scale: 1.2 }}
+                  whileTap={{ scale: 0.9 }}
+                >
+                  <FiPlus size={16} />
+                </motion.button>
 
-    <div className="absolute right-2 bottom-2 flex items-center space-x-1">
-      {inputMessage && (
-        <motion.button
-          onClick={() => setInputMessage('')}
-          className={`p-1.5 rounded-full ${themeClasses.hoverBg} transition-all`}
-          whileHover={{ scale: 1.2 }}
-          whileTap={{ scale: 0.9 }}
-        >
-          <FiX size={16} />
-        </motion.button>
-      )}
+                <motion.button
+                  onClick={() => handleSendMessage(inputMessage, pendingFiles)}
+                  disabled={(!inputMessage.trim() && pendingFiles.length === 0) || isBotTyping}
+                  className={`p-2 rounded-full transition-all duration-300 ${
+                    inputMessage.trim() || pendingFiles.length > 0
+                      ? 'bg-gradient-to-br from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white shadow-md'
+                      : 'text-gray-400 hover:text-gray-500 hover:bg-gray-100'
+                  }`}
+                  whileHover={{
+                    scale: (inputMessage.trim() || pendingFiles.length > 0) ? 1.15 : 1,
+                    rotate: (inputMessage.trim() || pendingFiles.length > 0) ? 6 : 0
+                  }}
+                  whileTap={{ scale: 0.9 }}
+                  title="Send message"
+                >
+                  <RiSendPlaneFill size={18} />
+                </motion.button>
+              </>
+            )}
+          </div>
+        </div>
 
-      {isBotTyping ? (
-        <motion.button
-          onClick={stopGeneration}
-          className="p-1.5 rounded-full bg-red-500 hover:bg-red-600 text-white transition-all shadow"
-          title="Stop generation"
-          whileHover={{ scale: 1.2 }}
-          whileTap={{ scale: 0.9 }}
-        >
-          <FiStopCircle size={16} />
-        </motion.button>
-      ) : (
-        <>
-          <motion.button
-            onClick={() => setShowFileOptions(!showFileOptions)}
-            className={`p-1.5 rounded-full transition-all ${showFileOptions ? `${themeClasses.bgTertiary}` : themeClasses.hoverBg}`}
-            title="Attach files"
-            whileHover={{ scale: 1.2 }}
-            whileTap={{ scale: 0.9 }}
-          >
-            <FiPlus size={16} />
-          </motion.button>
+        {/* File Options */}
+        <AnimatePresence>
+          {showFileOptions && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.25 }}
+              className="flex space-x-2 pt-2"
+            >
+              <motion.label
+                className={`cursor-pointer p-2 rounded-lg transition-all ${themeClasses.hoverBg}`}
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.95 }}
+                title="Upload image"
+              >
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleFileUpload}
+                  multiple
+                />
+                <FiImage size={18} />
+              </motion.label>
+              <motion.label
+                className={`cursor-pointer p-2 rounded-lg transition-all ${themeClasses.hoverBg}`}
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.95 }}
+                title="Upload file"
+              >
+                <input
+                  type="file"
+                  className="hidden"
+                  onChange={handleFileUpload}
+                  multiple
+                />
+                <FiFile size={18} />
+              </motion.label>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
 
-          <motion.button
-            onClick={() => handleSendMessage(inputMessage, pendingFiles)}
-            disabled={(!inputMessage.trim() && pendingFiles.length === 0) || isBotTyping}
-            className={`p-2 rounded-full transition-all duration-300 ${
-              inputMessage.trim() || pendingFiles.length > 0
-                ? 'bg-gradient-to-br from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white shadow-md'
-                : 'text-gray-400 hover:text-gray-500 hover:bg-gray-100'
-            }`}
-            whileHover={{
-              scale: (inputMessage.trim() || pendingFiles.length > 0) ? 1.15 : 1,
-              rotate: (inputMessage.trim() || pendingFiles.length > 0) ? 6 : 0
-            }}
-            whileTap={{ scale: 0.9 }}
-            title="Send message"
-          >
-            <RiSendPlaneFill size={18} />
-          </motion.button>
-        </>
-      )}
-    </div>
-  </div>
-
-  {/* File Options */}
-  <AnimatePresence>
-    {showFileOptions && (
-      <motion.div
-        initial={{ opacity: 0, height: 0 }}
-        animate={{ opacity: 1, height: 'auto' }}
-        exit={{ opacity: 0, height: 0 }}
-        transition={{ duration: 0.25 }}
-        className="flex space-x-2 pt-2"
-      >
-        <motion.label
-          className={`cursor-pointer p-2 rounded-lg transition-all ${themeClasses.hoverBg}`}
-          whileHover={{ scale: 1.1 }}
-          whileTap={{ scale: 0.95 }}
-          title="Upload image"
-        >
-          <input
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={handleFileUpload}
-            multiple
-          />
-          <FiImage size={18} />
-        </motion.label>
-        <motion.label
-          className={`cursor-pointer p-2 rounded-lg transition-all ${themeClasses.hoverBg}`}
-          whileHover={{ scale: 1.1 }}
-          whileTap={{ scale: 0.95 }}
-          title="Upload file"
-        >
-          <input
-            type="file"
-            className="hidden"
-            onChange={handleFileUpload}
-            multiple
-          />
-          <FiFile size={18} />
-        </motion.label>
-      </motion.div>
-    )}
-  </AnimatePresence>
-</div>
-
+      {/* Include Prism.js for syntax highlighting */}
+      <link 
+        href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.24.1/themes/prism-okaidia.min.css" 
+        rel="stylesheet" 
+      />
+      <link 
+        href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.24.1/plugins/line-numbers/prism-line-numbers.min.css" 
+        rel="stylesheet" 
+      />
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.24.1/components/prism-core.min.js"></script>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.24.1/plugins/autoloader/prism-autoloader.min.js"></script>
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.24.1/plugins/line-numbers/prism-line-numbers.min.js"></script>
       
       <style jsx global>{`
         /* Typing Dot */
@@ -1347,6 +1543,62 @@ and extremely friendly and very human little bit emoticon and get straight to th
         .code-block code {
           font-family: inherit;
           font-variant-ligatures: contextual;
+        }
+
+        /* Syntax highlighting */
+        .token.comment,
+        .token.prolog,
+        .token.doctype,
+        .token.cdata {
+          color: ${darkMode ? '#6b7280' : '#9ca3af'};
+        }
+
+        .token.punctuation {
+          color: ${darkMode ? '#e5e7eb' : '#4b5563'};
+        }
+
+        .token.property,
+        .token.tag,
+        .token.boolean,
+        .token.number,
+        .token.constant,
+        .token.symbol,
+        .token.deleted {
+          color: ${darkMode ? '#f472b6' : '#db2777'};
+        }
+
+        .token.selector,
+        .token.attr-name,
+        .token.string,
+        .token.char,
+        .token.builtin,
+        .token.inserted {
+          color: ${darkMode ? '#34d399' : '#059669'};
+        }
+
+        .token.operator,
+        .token.entity,
+        .token.url,
+        .language-css .token.string,
+        .style .token.string {
+          color: ${darkMode ? '#fbbf24' : '#d97706'};
+        }
+
+        .token.atrule,
+        .token.attr-value,
+        .token.keyword {
+          color: ${darkMode ? '#60a5fa' : '#2563eb'};
+        }
+
+        .token.function,
+        .token.class-name {
+          color: ${darkMode ? '#f59e0b' : '#d97706'};
+        }
+
+        .token.regex,
+        .token.important,
+        .token.variable {
+          color: ${darkMode ? '#f59e0b' : '#ea580c'};
         }
 
         .copy-notification {
