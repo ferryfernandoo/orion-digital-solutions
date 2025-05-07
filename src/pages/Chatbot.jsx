@@ -8,10 +8,10 @@ import {
   FiChevronDown, FiGlobe, FiExternalLink, FiCode
 } from 'react-icons/fi';
 import { RiSendPlaneFill } from 'react-icons/ri';
-import { SiJavascript, SiPython, SiJava, SiHtml5, SiCss3, SiTypescript } from 'react-icons/si';
+import { SiJavascript, SiPython, SiHtml5, SiCss3, SiTypescript } from 'react-icons/si';
 import { FaRobot } from 'react-icons/fa';
 
-// Enhanced web search with actual implementation
+// Web search implementation
 const performWebSearch = async (query) => {
   try {
     const response = await fetch(`https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1`);
@@ -33,7 +33,6 @@ const performWebSearch = async (query) => {
 
 const scrapeWebsiteContent = async (url) => {
   try {
-    // In production, replace with your own backend service
     const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
     const response = await fetch(proxyUrl);
     const data = await response.json();
@@ -42,7 +41,6 @@ const scrapeWebsiteContent = async (url) => {
     const parser = new DOMParser();
     const doc = parser.parseFromString(html, 'text/html');
     
-    // Remove unwanted elements
     const unwantedElements = doc.querySelectorAll('script, style, nav, footer, iframe, img');
     unwantedElements.forEach(el => el.remove());
     
@@ -60,7 +58,6 @@ const scrapeWebsiteContent = async (url) => {
 const languageIcons = {
   javascript: <SiJavascript className="text-yellow-400" />,
   python: <SiPython className="text-blue-400" />,
-  java: <SiJava className="text-red-400" />,
   html: <SiHtml5 className="text-orange-500" />,
   css: <SiCss3 className="text-blue-500" />,
   typescript: <SiTypescript className="text-blue-600" />,
@@ -88,7 +85,7 @@ const ChatBot = () => {
     processingSources: [],
     autoScroll: true,
     showScrollButton: false,
-    searchMode: false, // 'none', 'shallow', 'deep'
+    searchMode: false,
     searchResults: [],
     activeMemory: null
   });
@@ -100,7 +97,7 @@ const ChatBot = () => {
   const abortControllerRef = useRef(null);
 
   // Initialize AI model
-  const genAI = new GoogleGenerativeAI("AIzaSyDSTgkkROL7mjaGKoD2vnc8l2UptNCbvHk");
+  const genAI = new GoogleGenerativeAI("YOUR_API_KEY");
   const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
   // Load data from localStorage
