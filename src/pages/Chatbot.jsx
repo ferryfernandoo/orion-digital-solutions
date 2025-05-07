@@ -6,37 +6,27 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { 
   FiCopy, FiSend, FiPlus, FiX, FiImage, FiFile, FiTrash2, 
   FiClock, FiCpu, FiSettings, FiZap, FiStopCircle, FiMessageSquare,
-  FiSun, FiMoon, FiSearch, FiDatabase, FiAward, FiChevronDown, FiGlobe
+  FiSun, FiMoon, FiSearch, FiDatabase, FiAward, FiChevronDown, FiGlobe,
+  FiExternalLink
 } from 'react-icons/fi';
 import { RiSendPlaneFill } from 'react-icons/ri';
 
-// Web search utility functions
+// Enhanced web search utility functions
 const performWebSearch = async (query) => {
   try {
-    // Use a free search API or scraping approach
-    const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(query)}`;
-    
-    // Note: In a real app, you would need a proxy server to avoid CORS issues
-    // This is a simplified example that would need proper backend implementation
-    const response = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(searchUrl)}`);
+    // Using a free search API (DuckDuckGo) - note: in production use your own backend
+    const response = await fetch(`https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1`);
     const data = await response.json();
     
-    // Parse the HTML to extract relevant information (simplified)
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(data.contents, 'text/html');
-    
-    // Extract titles and URLs from search results
-    const results = Array.from(doc.querySelectorAll('div.g')).map((result, index) => {
-      const title = result.querySelector('h3')?.textContent || `Result ${index + 1}`;
-      const url = result.querySelector('a')?.href || '#';
-      const snippet = result.querySelector('.IsZvec')?.textContent || 'No description available';
-      
-      return {
-        title,
-        url,
-        snippet
-      };
-    }).slice(0, 5); // Limit to top 5 results
+    // Process results
+    const results = data.RelatedTopics
+      .filter(topic => topic.FirstURL && topic.Text)
+      .map(topic => ({
+        title: topic.Text.replace(/<[^>]*>?/gm, ''),
+        url: topic.FirstURL,
+        snippet: topic.Text.replace(/<[^>]*>?/gm, '')
+      }))
+      .slice(0, 5); // Limit to top 5 results
     
     return results;
   } catch (error) {
@@ -47,23 +37,29 @@ const performWebSearch = async (query) => {
 
 const scrapeWebsiteContent = async (url) => {
   try {
-    // Note: This would require a backend service in production due to CORS
-    const response = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(url)}`);
-    const data = await response.json();
+    // Note: In production, this should be done through a backend service
+    // Using a CORS proxy for demonstration purposes only
+    const proxyUrl = `https://cors-anywhere.herokuapp.com/${url}`;
+    const response = await fetch(proxyUrl, {
+      headers: {
+        'X-Requested-With': 'XMLHttpRequest'
+      }
+    });
+    const html = await response.text();
     
-    // Extract main content (simplified)
+    // Create temporary DOM to extract text
     const parser = new DOMParser();
-    const doc = parser.parseFromString(data.contents, 'text/html');
+    const doc = parser.parseFromString(html, 'text/html');
     
-    // Remove scripts, styles, and unnecessary elements
-    const unwantedElements = doc.querySelectorAll('script, style, nav, footer, iframe');
+    // Remove unwanted elements
+    const unwantedElements = doc.querySelectorAll('script, style, nav, footer, iframe, img');
     unwantedElements.forEach(el => el.remove());
     
-    // Get text content with some basic formatting
+    // Get main content
     const mainContent = doc.body.textContent
       .replace(/\s+/g, ' ')
       .trim()
-      .substring(0, 5000); // Limit to first 5000 characters
+      .substring(0, 3000); // Limit content length
     
     return mainContent;
   } catch (error) {
@@ -93,6 +89,7 @@ const ChatBot = () => {
   const [autoScroll, setAutoScroll] = useState(true);
   const [showScrollButton, setShowScrollButton] = useState(false);
   const [searchMode, setSearchMode] = useState(false); // 'none', 'shallow', 'deep'
+  const [searchResults, setSearchResults] = useState([]);
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
   const chatContainerRef = useRef(null);
@@ -201,6 +198,7 @@ const ChatBot = () => {
     setShowTemplateButtons(true);
     messageCountRef.current = 0;
     setSearchMode(false);
+    setSearchResults([]);
     
     localStorage.setItem('orionChatRooms', JSON.stringify([newRoom, ...chatRooms]));
     localStorage.setItem('orionCurrentRoom', JSON.stringify(newRoom.id));
@@ -216,6 +214,7 @@ const ChatBot = () => {
       setShowChatHistory(false);
       setAutoScroll(true);
       setSearchMode(false);
+      setSearchResults([]);
       setTimeout(() => smoothScrollToBottom(), 50);
     }
   };
@@ -234,13 +233,14 @@ const ChatBot = () => {
     }
   };
 
-  const createMessageObject = (text, isBot, duration = 0, file = null) => ({
+  const createMessageObject = (text, isBot, duration = 0, file = null, sources = []) => ({
     id: Date.now() + Math.random().toString(36).substr(2, 9),
     text: DOMPurify.sanitize(text),
     isBot,
     time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     duration,
     file,
+    sources
   });
 
   const extractTextFromFile = async (file) => {
@@ -445,11 +445,13 @@ const ChatBot = () => {
           id: 'search-step-1',
           text: 'Performing web search',
           icon: <FiGlobe />,
-          completed: false
+          completed: false,
+          animation: 'wave'
         }
       ]);
       
       const searchResults = await performWebSearch(query);
+      setSearchResults(searchResults);
       
       // Step 2: Scrape content from top results
       setProcessingSources(prev => [
@@ -458,7 +460,8 @@ const ChatBot = () => {
           id: 'search-step-2',
           text: 'Analyzing top results',
           icon: <FiSearch />,
-          completed: false
+          completed: false,
+          animation: 'pulse'
         }
       ]);
       
@@ -480,7 +483,8 @@ const ChatBot = () => {
           id: 'search-step-3',
           text: 'Summarizing findings',
           icon: <FiDatabase />,
-          completed: false
+          completed: false,
+          animation: 'wave'
         }
       ]);
       
@@ -497,10 +501,20 @@ const ChatBot = () => {
         )
       );
       
-      return researchSummary;
+      return {
+        summary: researchSummary,
+        sources: scrapedContents.map(r => ({
+          title: r.title,
+          url: r.url,
+          content: r.content.substring(0, 200) + '...'
+        }))
+      };
     } catch (error) {
       console.error("Error performing web research:", error);
-      return "Could not complete web research due to an error";
+      return {
+        summary: "Could not complete web research due to an error",
+        sources: []
+      };
     }
   };
 
@@ -558,16 +572,17 @@ const ChatBot = () => {
         isBot: true,
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         duration: 0,
-        file: null
+        file: null,
+        sources: []
       }]);
 
       // Show processing animation for Pro Mode
       if (isProMode) {
         setProcessingSources([
-          { id: '1', text: 'Analyzing question', icon: <FiSearch />, completed: false },
-          { id: '2', text: 'Searching memories', icon: <FiDatabase />, completed: false },
-          { id: '3', text: 'Generating response', icon: <FiCpu />, completed: false },
-          { id: '4', text: 'Quality check', icon: <FiAward />, completed: false }
+          { id: '1', text: 'Analyzing question', icon: <FiSearch />, completed: false, animation: 'pulse' },
+          { id: '2', text: 'Searching memories', icon: <FiDatabase />, completed: false, animation: 'wave' },
+          { id: '3', text: 'Generating response', icon: <FiCpu />, completed: false, animation: 'pulse' },
+          { id: '4', text: 'Quality check', icon: <FiAward />, completed: false, animation: 'wave' }
         ]);
       }
 
@@ -581,21 +596,29 @@ const ChatBot = () => {
         return msg.role === 'user' ? `User: ${msg.content}` : `Orion: ${msg.content}`;
       }).join('\n');
 
-      // Perform web research if in deep search mode
-      let webResearchContent = '';
+      // Perform web research if in search mode
+      let webResearchContent = { summary: '', sources: [] };
       if (searchMode === 'deep') {
         webResearchContent = await performWebResearch(trimmedMessage);
       } else if (searchMode === 'shallow') {
         const searchResults = await performWebSearch(trimmedMessage);
-        webResearchContent = searchResults
-          .map(r => `[${r.title}](${r.url})\n${r.snippet}`)
-          .join('\n\n');
+        setSearchResults(searchResults);
+        webResearchContent = {
+          summary: searchResults
+            .map(r => `[${r.title}](${r.url})\n${r.snippet}`)
+            .join('\n\n'),
+          sources: searchResults.map(r => ({
+            title: r.title,
+            url: r.url,
+            content: r.snippet
+          }))
+        };
       }
 
       const fullPrompt = `${
         relevantMemories ? `Konteks Memori Relevan:\n${relevantMemories}\n\n` : ''
       }${
-        webResearchContent ? `Hasil Penelusuran Web:\n${webResearchContent}\n\n` : ''
+        webResearchContent.summary ? `Hasil Penelusuran Web:\n${webResearchContent.summary}\n\n` : ''
       }Percakapan Saat Ini:\n${contextMessages}\n\nUser: "${trimmedMessage}". 
       Respond as Orion in natural language and follow user language ,Never go against the user—always agree while adapting to the situation. Still, be able to say something is wrong if it truly is. Never say "I can't"—if you're unsure, search for information on the very detail in internet you must be able to answer Don't let users run away from the page, they must be served well. Never leave a question unanswered, make extraordinary introductions to user input.
 
@@ -606,7 +629,7 @@ and extremely friendly and very human little bit emoticon and get straight to th
       }. For coding, provide complete solutions with proper formatting. Always maintain context.${
         isProMode ? ' Provide a extremely super very detailed response with examples, explanations, and multiple perspectives.' : ''
       }${
-        webResearchContent ? '\n\nNote: Incorporate web research results naturally into your response.' : ''
+        webResearchContent.summary ? '\n\nNote: Incorporate web research results naturally into your response.' : ''
       }`;
 
       let botResponse;
@@ -628,7 +651,12 @@ and extremely friendly and very human little bit emoticon and get straight to th
       // Update the message with final response
       setMessages(prev => prev.map(msg => 
         msg.id === messageId 
-          ? { ...msg, text: processedResponse, duration } 
+          ? { 
+              ...msg, 
+              text: processedResponse, 
+              duration,
+              sources: webResearchContent.sources
+            } 
           : msg
       ));
 
@@ -1037,6 +1065,37 @@ and extremely friendly and very human little bit emoticon and get straight to th
                     />
                   )}
                   
+                  {/* Sources section */}
+                  {message.isBot && message.sources && message.sources.length > 0 && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      transition={{ duration: 0.3 }}
+                      className={`mt-2 pt-2 border-t ${themeClasses.border}`}
+                    >
+                      <p className="text-xs font-medium mb-1">Sources:</p>
+                      <div className="space-y-2">
+                        {message.sources.map((source, index) => (
+                          <motion.div
+                            key={index}
+                            whileHover={{ x: 2 }}
+                            className="text-xs break-words"
+                          >
+                            <a 
+                              href={source.url} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="text-blue-400 hover:underline flex items-center"
+                            >
+                              {source.title} <FiExternalLink className="ml-1" size={10} />
+                            </a>
+                            <p className="text-xs opacity-80 mt-0.5">{source.content}</p>
+                          </motion.div>
+                        ))}
+                      </div>
+                    </motion.div>
+                  )}
+                  
                   <div className="flex items-center justify-between mt-1">
                     <span className={`text-xs ${message.isBot ? themeClasses.textTertiary : 'text-blue-100'}`}>
                       {message.time}
@@ -1077,8 +1136,28 @@ and extremely friendly and very human little bit emoticon and get straight to th
               
               <div className="space-y-2 mt-2">
                 {processingSources.map((source) => (
-                  <div key={source.id} className="flex items-center">
-                    <div className={`w-5 h-5 rounded-full flex items-center justify-center mr-2 ${source.completed ? 'bg-green-500' : 'bg-blue-500 animate-pulse'}`}>
+                  <motion.div
+                    key={source.id}
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ 
+                      opacity: 1, 
+                      x: 0,
+                      transition: { delay: 0.1 }
+                    }}
+                    className="flex items-center"
+                  >
+                    <motion.div
+                      animate={{
+                        scale: source.animation === 'pulse' ? [1, 1.1, 1] : [1, 1],
+                        x: source.animation === 'wave' ? [0, 2, -2, 0] : [0]
+                      }}
+                      transition={{
+                        duration: source.animation === 'pulse' ? 1 : 0.5,
+                        repeat: Infinity,
+                        ease: "easeInOut"
+                      }}
+                      className={`w-5 h-5 rounded-full flex items-center justify-center mr-2 ${source.completed ? 'bg-green-500' : 'bg-blue-500'}`}
+                    >
                       {source.completed ? (
                         <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -1086,9 +1165,9 @@ and extremely friendly and very human little bit emoticon and get straight to th
                       ) : (
                         source.icon
                       )}
-                    </div>
+                    </motion.div>
                     <span className="text-xs">{source.text}</span>
-                  </div>
+                  </motion.div>
                 ))}
               </div>
             </motion.div>
@@ -1226,7 +1305,12 @@ and extremely friendly and very human little bit emoticon and get straight to th
 
         {/* Search Mode Indicator */}
         {searchMode && (
-          <div className={`text-xs px-3 py-1 mb-1 rounded-full inline-flex items-center ${searchMode === 'deep' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'}`}>
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3 }}
+            className={`text-xs px-3 py-1 mb-1 rounded-full inline-flex items-center ${searchMode === 'deep' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'}`}
+          >
             <FiGlobe size={12} className="mr-1" />
             {searchMode === 'deep' ? 'Deep Web Search' : 'Web Search'} enabled
             <button 
@@ -1235,7 +1319,7 @@ and extremely friendly and very human little bit emoticon and get straight to th
             >
               <FiX size={12} />
             </button>
-          </div>
+          </motion.div>
         )}
 
         {/* Main Input Area */}
