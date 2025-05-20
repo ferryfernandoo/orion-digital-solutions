@@ -140,7 +140,7 @@ const scrapeWebsiteContent = async (url) => {
       return mainContent;
     }
     return "Could not retrieve website content";
-  } catch (error) {
+  } catch (error)
     console.error("Scraping error:", error);
     return "Error retrieving website content";
   }
@@ -177,7 +177,7 @@ const ChatBot = () => {
 
   // Initialize ORION Generative AI
   const genAI = new GoogleGenerativeAI("AIzaSyDSTgkkROL7mjaGKoD2vnc8l2UptNCbvHk");
-  const model = genAI.getGenerativeModel({ model: "ORION-Generative-AI" });
+  const model = genAI.getGenerativeModel({ model: "models/gemini-2.0-flash" });
 
   // Enhanced memory system
   const loadMemories = useCallback(() => {
