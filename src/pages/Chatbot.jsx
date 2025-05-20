@@ -8,7 +8,6 @@ import {
   FiUser, FiCode, FiHelpCircle, FiLightbulb
 } from 'react-icons/fi';
 
-
 const ChatBot = () => {
   const [chatRooms, setChatRooms] = useState([]);
   const [currentRoomId, setCurrentRoomId] = useState(null);
@@ -50,7 +49,7 @@ const ChatBot = () => {
     if (savedChatRooms) setChatRooms(JSON.parse(savedChatRooms));
     if (savedCurrentRoom) {
       setCurrentRoomId(savedCurrentRoom);
-      const room = JSON.parse(savedCurrentRoom);
+      const room = chatRooms.find(r => r.id === savedCurrentRoom);
       if (room) {
         setMessages(room.messages || []);
         setChatHistory(room.history || []);
@@ -59,7 +58,7 @@ const ChatBot = () => {
     if (savedProMode) setIsProMode(savedProMode === 'true');
     if (savedDarkMode) setDarkMode(savedDarkMode === 'true');
     
-    if (!savedCurrentRoom && (!savedChatRooms || JSON.parse(savedChatRooms).length === 0) {
+    if (!savedCurrentRoom && (!savedChatRooms || JSON.parse(savedChatRooms).length === 0)) {
       createNewChatRoom();
     }
   }, []);
@@ -76,7 +75,7 @@ const ChatBot = () => {
       localStorage.setItem('orionChatRooms', JSON.stringify(updatedRooms));
       localStorage.setItem('orionCurrentRoom', JSON.stringify(currentRoomId));
     }
-  }, [messages, chatHistory, currentRoomId]);
+  }, [messages, chatHistory, currentRoomId, chatRooms]);
 
   // Toggle dark mode
   const toggleDarkMode = () => {
@@ -312,8 +311,6 @@ const ChatBot = () => {
     return enhancedResponse;
   };
 
-  const currentMessageId = useRef(null);
-
   const stopGeneration = () => {
     if (abortController) {
       abortController.abort();
@@ -385,7 +382,6 @@ const ChatBot = () => {
       }`;
 
       const messageId = Date.now().toString();
-      currentMessageId.current = messageId;
       
       setMessages(prev => [...prev, {
         id: messageId,
@@ -450,7 +446,6 @@ const ChatBot = () => {
       setProcessingSources([]);
       clearTimeout(timeoutId);
       setAbortController(null);
-      currentMessageId.current = null;
     }
   };
 
