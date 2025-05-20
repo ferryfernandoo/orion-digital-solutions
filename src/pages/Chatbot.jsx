@@ -7,7 +7,7 @@ import {
   FiCopy, FiSend, FiPlus, FiX, FiImage, FiFile, FiTrash2, 
   FiClock, FiCpu, FiSettings, FiZap, FiStopCircle, FiMessageSquare,
   FiSun, FiMoon, FiSearch, FiDatabase, FiAward, FiChevronDown, FiGlobe,
-  FiExternalLink, FiCheck
+  FiExternalLink, FiCheck, FiInfo, FiStar, FiAlertTriangle
 } from 'react-icons/fi';
 import { RiSendPlaneFill } from 'react-icons/ri';
 
@@ -43,30 +43,6 @@ const extractTextFromImage = async (file) => {
 // PDF text extraction using pdf.js (client-side)
 const extractTextFromPDF = async (file) => {
   return new Promise((resolve) => {
-    // In a real app, you'd use pdf.js like this:
-    /*
-    const pdfjs = await import('pdfjs-dist/build/pdf');
-    const pdfjsWorker = await import('pdfjs-dist/build/pdf.worker.entry');
-    pdfjs.GlobalWorkerOptions.workerSrc = pdfjsWorker;
-    
-    const arrayBuffer = await file.arrayBuffer();
-    const loadingTask = pdfjs.getDocument(arrayBuffer);
-    
-    let fullText = '';
-    try {
-      const pdf = await loadingTask.promise;
-      for (let i = 1; i <= pdf.numPages; i++) {
-        const page = await pdf.getPage(i);
-        const textContent = await page.getTextContent();
-        fullText += textContent.items.map(item => item.str).join(' ');
-      }
-      resolve(fullText || "No text found in PDF");
-    } catch (error) {
-      console.error("PDF extraction error:", error);
-      resolve("Could not extract text from PDF");
-    }
-    */
-    
     // Simulating for demo purposes
     setTimeout(() => {
       resolve(`Extracted text from PDF: ${file.name}\n\nThis is a simulated PDF extraction result. In a real app, we would use pdf.js to extract all text content from the PDF document.`);
@@ -169,6 +145,8 @@ const ChatBot = () => {
   const [searchMode, setSearchMode] = useState(false); // 'none', 'shallow', 'deep'
   const [searchResults, setSearchResults] = useState([]);
   const [copiedMessageId, setCopiedMessageId] = useState(null);
+  const [memoryImportanceFilter, setMemoryImportanceFilter] = useState('all'); // 'all', 'important', 'normal'
+  const [showMemoryDetails, setShowMemoryDetails] = useState(null);
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
   const chatContainerRef = useRef(null);
@@ -179,28 +157,13 @@ const ChatBot = () => {
   const genAI = new GoogleGenerativeAI("AIzaSyDSTgkkROL7mjaGKoD2vnc8l2UptNCbvHk");
   const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-  // Enhanced memory system
+  // Enhanced memory system with Indonesian language support
   const loadMemories = useCallback(() => {
     const savedMemories = localStorage.getItem('orionMemories');
     if (savedMemories) {
       try {
         const parsed = JSON.parse(savedMemories);
-        // Migrate old memory format if needed
-        if (parsed.length > 0 && !parsed[0].context) {
-          const migrated = parsed.map(mem => ({
-            ...mem,
-            context: {
-              date: mem.date,
-              roomId: mem.roomId || null,
-              tags: mem.tags || []
-            },
-            embeddings: mem.embeddings || []
-          }));
-          setMemories(migrated);
-          localStorage.setItem('orionMemories', JSON.stringify(migrated));
-        } else {
-          setMemories(parsed);
-        }
+        setMemories(parsed);
       } catch (e) {
         console.error("Error loading memories:", e);
       }
@@ -298,7 +261,7 @@ const ChatBot = () => {
   const createNewChatRoom = () => {
     const newRoom = {
       id: Date.now().toString(),
-      name: `Chat ${new Date().toLocaleTimeString()}`,
+      name: `Percakapan ${new Date().toLocaleTimeString()}`,
       messages: [],
       history: [],
       createdAt: new Date().toISOString(),
@@ -378,19 +341,26 @@ const ChatBot = () => {
     return `File content not extractable: ${file.name}`;
   };
 
+  // Enhanced Indonesian-aware summarization
   const summarizeConversation = async (conversation) => {
     try {
-      const prompt = `Buat ringkasan sangat singkat sepadat padatnya (maks 1 kalimat) dari percakapan ini dalam bahasa yang sama dengan percakapan. Fokus pada fakta kunci, keputusan, dan detail penting. HILANGKAN semua salam dan basa-basi.\n\nPercakapan:\n${conversation}`;
+      const prompt = `Buat ringkasan sangat singkat (maksimal 1 kalimat) dari percakapan ini dalam bahasa yang sama dengan percakapan. Fokus pada fakta kunci, keputusan, dan detail penting. Hilangkan semua salam dan basa-basi. Berikan juga tingkat kepentingan (1-5, 5 paling penting) berdasarkan:\n
+      1. Apakah mengandung informasi penting jangka panjang?\n
+      2. Apakah ada keputusan atau kesepakatan?\n
+      3. Apakah ada data atau fakta penting?\n
+      4. Apakah ada preferensi atau kebiasaan pengguna?\n
+      Format output: [RINGKASAN] | [TINGKAT_KEPENTINGAN]\n\nPercakapan:\n${conversation}`;
+      
       const result = await model.generateContent(prompt);
       const response = await result.response.text();
-      return response.replace(/[{}]/g, '').replace(/json/gi, '').replace(/```/g, '').trim() || "Ringkasan tidak tersedia";
+      return response.trim() || "Tidak bisa membuat ringkasan | 1";
     } catch (error) {
       console.error("Error summarizing conversation:", error);
-      return "Tidak bisa membuat ringkasan";
+      return "Tidak bisa membuat ringkasan | 1";
     }
   };
 
-  // Enhanced memory finding with semantic search
+  // Enhanced memory finding with semantic search (Indonesian support)
   const findRelevantMemories = async (query) => {
     if (memories.length === 0) return '';
     
@@ -405,7 +375,7 @@ const ChatBot = () => {
       
       if (recentMemories.length > 0) {
         return recentMemories
-          .map(mem => `[Memory ${mem.context.date}]: ${mem.summary}\nDetail: ${
+          .map(mem => `[Memori ${mem.context.date} - Penting: ${mem.context.importance}/5]: ${mem.summary}\nDetail: ${
             mem.messages.map(msg => `${msg.isBot ? 'Orion' : 'User'}: ${msg.text.replace(/<[^>]*>?/gm, '')}`).join('\n')
           }`)
           .join('\n\n');
@@ -414,10 +384,10 @@ const ChatBot = () => {
       // If no exact matches, use AI to find semantically similar memories
       const memoryTexts = memories
         .slice(0, 50) // Limit to 50 memories for performance
-        .map(m => `ID: ${m.id}\nSummary: ${m.summary}\nTags: ${m.context.tags.join(', ')}`)
+        .map(m => `ID: ${m.id}\nSummary: ${m.summary}\nTags: ${m.context.tags.join(', ')}\nImportance: ${m.context.importance}`)
         .join('\n\n');
       
-      const prompt = `Daftar memori:\n${memoryTexts}\n\nPertanyaan: "${query}"\n\nIdentifikasi ID memori yang paling relevan (berdasarkan makna, bukan kata kunci). Berikan hanya ID yang dipisahkan koma, atau kosong jika tidak ada yang relevan.`;
+      const prompt = `Daftar memori:\n${memoryTexts}\n\nPertanyaan: "${query}"\n\nIdentifikasi ID memori yang paling relevan (berdasarkan makna, bukan kata kunci) untuk pertanyaan dalam bahasa Indonesia. Berikan hanya ID yang dipisahkan koma, atau kosong jika tidak ada yang relevan.`;
       
       const result = await model.generateContent(prompt);
       const response = await result.response.text();
@@ -425,7 +395,7 @@ const ChatBot = () => {
       
       return memories
         .filter(m => relevantIds.includes(m.id))
-        .map(m => `[Memory ${m.context.date}]: ${m.summary}\nDetail: ${
+        .map(m => `[Memori ${m.context.date} - Penting: ${m.context.importance}/5]: ${m.summary}\nDetail: ${
           m.messages.map(msg => `${msg.isBot ? 'Orion' : 'User'}: ${msg.text.replace(/<[^>]*>?/gm, '')}`).join('\n')
         }`)
         .join('\n\n');
@@ -435,18 +405,21 @@ const ChatBot = () => {
     }
   };
 
-  // Enhanced auto-save with context
+  // Enhanced auto-save with context (Indonesian support)
   const autoSaveToMemory = useCallback(async () => {
     if (messages.length === 0 || messageCountRef.current % 3 !== 0) return;
     
     try {
       setIsBotTyping(true);
       const conversationText = messages.map(msg => `${msg.isBot ? 'Orion' : 'User'}: ${msg.text}`).join('\n');
-      const summary = await summarizeConversation(conversationText);
+      const summaryWithImportance = await summarizeConversation(conversationText);
+      
+      const [summary, importanceStr] = summaryWithImportance.split('|').map(s => s.trim());
+      const importance = parseInt(importanceStr) || 1;
       
       if (summary && !summary.includes("tidak bisa")) {
-        // Generate tags for better memory organization
-        const tagPrompt = `Beri 2-3 tag pendek (dalam bahasa Inggris) untuk ringkasan ini:\n"${summary}"\n\nTags harus berupa kata benda dan dipisahkan koma.`;
+        // Generate tags in Indonesian for better memory organization
+        const tagPrompt = `Beri 2-3 tag pendek dalam Bahasa Indonesia untuk ringkasan ini:\n"${summary}"\n\nTags harus berupa kata benda yang relevan dan dipisahkan koma.`;
         const tagResult = await model.generateContent(tagPrompt);
         const tags = (await tagResult.response.text())
           .split(',')
@@ -458,9 +431,11 @@ const ChatBot = () => {
           summary,
           messages: [...messages],
           context: {
-            date: new Date().toLocaleString(),
+            date: new Date().toLocaleString('id-ID'),
             roomId: currentRoomId,
-            tags
+            tags,
+            importance,
+            language: 'indonesia' // Track language of memory
           },
           embeddings: [] // Would be filled with vector embeddings in a real app
         };
@@ -584,7 +559,7 @@ const ChatBot = () => {
         ...prev,
         {
           id: 'search-step-1',
-          text: 'Performing web search',
+          text: 'Mencari di web',
           icon: <FiGlobe />,
           completed: false,
           animation: 'wave'
@@ -599,7 +574,7 @@ const ChatBot = () => {
         ...prev,
         {
           id: 'search-step-2',
-          text: 'Analyzing top results',
+          text: 'Menganalisis hasil',
           icon: <FiSearch />,
           completed: false,
           animation: 'pulse'
@@ -623,7 +598,7 @@ const ChatBot = () => {
         ...prev,
         {
           id: 'search-step-3',
-          text: 'Summarizing findings',
+          text: 'Meringkas temuan',
           icon: <FiDatabase />,
           completed: false,
           animation: 'wave'
@@ -631,14 +606,14 @@ const ChatBot = () => {
       ]);
       
       const researchSummary = scrapedContents
-        .map(r => `[Source: ${r.title} (${r.url}) - ${r.source}]\n${r.content.substring(0, 1000)}...`)
+        .map(r => `[Sumber: ${r.title} (${r.url}) - ${r.source}]\n${r.content.substring(0, 1000)}...`)
         .join('\n\n');
       
       // Update processing sources
       setProcessingSources(prev => 
         prev.map(source => 
           source.id.startsWith('search-step') 
-            ? { ...source, completed: true, text: source.text + ' (completed)' } 
+            ? { ...source, completed: true, text: source.text + ' (selesai)' } 
             : source
         )
       );
@@ -655,7 +630,7 @@ const ChatBot = () => {
     } catch (error) {
       console.error("Error performing web research:", error);
       return {
-        summary: "Could not complete web research due to an error",
+        summary: "Tidak bisa menyelesaikan pencarian web karena error",
         sources: []
       };
     }
@@ -711,7 +686,7 @@ const ChatBot = () => {
       
       setMessages(prev => [...prev, {
         id: messageId,
-        text: isProMode ? 'Processing with Pro Mode (this may take a moment)...' : '',
+        text: isProMode ? 'Memproses dengan Pro Mode (mungkin butuh waktu sebentar)...' : '',
         isBot: true,
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         duration: 0,
@@ -722,10 +697,10 @@ const ChatBot = () => {
       // Show processing animation for Pro Mode
       if (isProMode) {
         setProcessingSources([
-          { id: '1', text: 'Analyzing question', icon: <FiSearch />, completed: false, animation: 'pulse' },
-          { id: '2', text: 'Searching memories', icon: <FiDatabase />, completed: false, animation: 'wave' },
-          { id: '3', text: 'Generating response', icon: <FiCpu />, completed: false, animation: 'pulse' },
-          { id: '4', text: 'Quality check', icon: <FiAward />, completed: false, animation: 'wave' }
+          { id: '1', text: 'Menganalisis pertanyaan', icon: <FiSearch />, completed: false, animation: 'pulse' },
+          { id: '2', text: 'Mencari memori', icon: <FiDatabase />, completed: false, animation: 'wave' },
+          { id: '3', text: 'Membuat respon', icon: <FiCpu />, completed: false, animation: 'pulse' },
+          { id: '4', text: 'Pengecekan kualitas', icon: <FiAward />, completed: false, animation: 'wave' }
         ]);
       }
 
@@ -827,7 +802,7 @@ and extremely friendly and very human little bit emoticon and get straight to th
 
     } catch (error) {
       const errorMessage = error.name === 'AbortError' 
-        ? 'Response stopped by user'
+        ? 'Respon dihentikan oleh pengguna'
         : 'Waduh, ada yang salah nih sama Orion! Gak konek ke servernya...';
       
       setMessages(prev => [...prev, createMessageObject(errorMessage, true)]);
@@ -908,6 +883,12 @@ and extremely friendly and very human little bit emoticon and get straight to th
     });
   };
 
+  const filteredMemories = memories.filter(memory => {
+    if (memoryImportanceFilter === 'all') return true;
+    if (memoryImportanceFilter === 'important') return memory.context.importance >= 4;
+    return memory.context.importance < 4;
+  });
+
   // Initialize Prism for syntax highlighting
   useEffect(() => {
     const handleCopyClick = (e) => {
@@ -973,7 +954,7 @@ and extremely friendly and very human little bit emoticon and get straight to th
           <button 
             onClick={() => setShowChatHistory(!showChatHistory)}
             className={`p-1.5 rounded-full ${themeClasses.hoverBg} transition-colors`}
-            title="Chat history"
+            title="Riwayat Percakapan"
           >
             <FiMessageSquare size={16} className={themeClasses.textSecondary} />
           </button>
@@ -988,12 +969,12 @@ and extremely friendly and very human little bit emoticon and get straight to th
                   <span className="typing-dot"></span>
                   <span className="typing-dot"></span>
                   <span className="typing-dot"></span>
-                  <span className="ml-1">Thinking...</span>
+                  <span className="ml-1">Sedang berpikir...</span>
                 </span>
               ) : (
                 <span className="flex items-center">
                   <span className="w-1.5 h-1.5 bg-green-500 rounded-full mr-1"></span>
-                  Online {isProMode && <span className="ml-1 text-blue-400">(Pro Mode)</span>}
+                  Online {isProMode && <span className="ml-1 text-blue-400">(Mode Pro)</span>}
                 </span>
               )}
             </p>
@@ -1003,29 +984,33 @@ and extremely friendly and very human little bit emoticon and get straight to th
           <button 
             onClick={toggleDarkMode}
             className={`p-1.5 rounded-full transition-colors ${themeClasses.hoverBg}`}
-            title={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+            title={darkMode ? 'Ganti ke mode terang' : 'Ganti ke mode gelap'}
           >
             {darkMode ? <FiSun size={16} className="text-yellow-300" /> : <FiMoon size={16} />}
           </button>
           <button 
             onClick={toggleProMode}
-            className={`p-1.5 rounded-full transition-colors ${isProMode ? 'bg-blue-100 text-blue-600' : themeClasses.hoverBg}`}
-            title={isProMode ? 'Disable Pro Mode' : 'Enable Pro Mode'}
+            className={`p-1.5 rounded-full transition-all ${
+              isProMode ? 'bg-blue-100 text-blue-600' : themeClasses.hoverBg
+            }`}
+            title={isProMode ? 'Matikan Mode Pro' : 'Aktifkan Mode Pro'}
           >
             <FiZap size={16} className={isProMode ? "text-yellow-500" : ""} />
           </button>
           <motion.button
             animate={controls}
             onClick={() => setShowMemoryPanel(!showMemoryPanel)}
-            className={`p-1.5 rounded-full transition-colors ${showMemoryPanel ? `${themeClasses.bgTertiary} ${themeClasses.textPrimary}` : themeClasses.hoverBg}`}
-            title="Memory"
+            className={`p-1.5 rounded-full transition-colors ${
+              showMemoryPanel ? `${themeClasses.bgTertiary} ${themeClasses.textPrimary}` : themeClasses.hoverBg
+            }`}
+            title="Memori"
           >
             <FiCpu size={16} />
           </motion.button>
           <button
             onClick={createNewChatRoom}
             className={`p-1.5 rounded-full ${themeClasses.hoverBg} transition-colors`}
-            title="New Chat"
+            title="Percakapan Baru"
           >
             <FiPlus size={16} />
           </button>
@@ -1042,7 +1027,7 @@ and extremely friendly and very human little bit emoticon and get straight to th
           className={`absolute left-3 top-14 ${themeClasses.cardBg} rounded-xl shadow-xl z-20 ${themeClasses.border} w-72`}
         >
           <div className={`p-3 ${themeClasses.border} flex justify-between items-center`}>
-            <h4 className="font-medium text-sm">Chat History</h4>
+            <h4 className="font-medium text-sm">Riwayat Percakapan</h4>
             <button 
               onClick={() => setShowChatHistory(false)}
               className={`p-1 ${themeClasses.textSecondary} hover:${themeClasses.textPrimary}`}
@@ -1054,7 +1039,7 @@ and extremely friendly and very human little bit emoticon and get straight to th
           <div className="max-h-96 overflow-y-auto scrollbar-thin text-sm">
             {chatRooms.length === 0 ? (
               <div className="p-4 text-center text-sm">
-                No chat history yet
+                Belum ada riwayat percakapan
               </div>
             ) : (
               <div className={`divide-y ${themeClasses.border}`}>
@@ -1079,7 +1064,7 @@ and extremely friendly and very human little bit emoticon and get straight to th
                       </button>
                     </div>
                     <p className="text-xs mt-1">
-                      {new Date(room.createdAt).toLocaleString()}
+                      {new Date(room.createdAt).toLocaleString('id-ID')}
                     </p>
                     {room.messages.length > 0 && (
                       <p className="text-xs mt-1 truncate">
@@ -1115,7 +1100,7 @@ and extremely friendly and very human little bit emoticon and get straight to th
               transition={{ delay: 0.1, duration: 0.3 }}
               className="text-xl font-semibold text-center mb-1"
             >
-              Hello, I'm Orion 😊!
+              Halo, saya Orion 😊!
             </motion.h3>
             <motion.p 
               initial={{ y: 10, opacity: 0 }}
@@ -1123,7 +1108,7 @@ and extremely friendly and very human little bit emoticon and get straight to th
               transition={{ delay: 0.2, duration: 0.3 }}
               className="text-center mb-6 max-w-md text-sm"
             >
-              Your AI assistant with automatic memory. Ask me anything or upload files for analysis.
+              Asisten AI Anda dengan memori otomatis. Tanyakan apa saja atau unggah file untuk dianalisis.
             </motion.p>
             
             {showTemplateButtons && (
@@ -1135,24 +1120,24 @@ and extremely friendly and very human little bit emoticon and get straight to th
               >
                 {[
                   { 
-                    title: "Say hello", 
-                    desc: "Start a conversation",
-                    message: "Hello Orion! How are you today?" 
+                    title: "Sapa Orion", 
+                    desc: "Mulai percakapan",
+                    message: "Halo Orion! Apa kabar hari ini?" 
                   },
                   { 
-                    title: "Brainstorm ideas", 
-                    desc: "Get creative suggestions",
-                    message: "Brainstorm some creative ideas for my project about..." 
+                    title: "Brainstorm ide", 
+                    desc: "Dapatkan saran kreatif",
+                    message: "Berikan beberapa ide kreatif untuk proyek saya tentang..." 
                   },
                   { 
-                    title: "Explain something", 
-                    desc: "Get clear explanations",
-                    message: "Explain how machine learning works in simple terms" 
+                    title: "Jelaskan sesuatu", 
+                    desc: "Dapatkan penjelasan jelas",
+                    message: "Jelaskan bagaimana machine learning bekerja dengan bahasa sederhana" 
                   },
                   { 
-                    title: "Code help", 
-                    desc: "Debug or explain code",
-                    message: "Help me debug this code..." 
+                    title: "Bantuan koding", 
+                    desc: "Debug atau jelaskan kode",
+                    message: "Bantu saya debug kode ini..." 
                   }
                 ].map((item, index) => (
                   <motion.button
@@ -1229,7 +1214,7 @@ and extremely friendly and very human little bit emoticon and get straight to th
                       transition={{ duration: 0.3 }}
                       className={`mt-2 pt-2 border-t ${themeClasses.border}`}
                     >
-                      <p className="text-xs font-medium mb-1">Sources:</p>
+                      <p className="text-xs font-medium mb-1">Sumber:</p>
                       <div className="space-y-2">
                         {message.sources.map((source, index) => (
                           <motion.div
@@ -1269,7 +1254,7 @@ and extremely friendly and very human little bit emoticon and get straight to th
                           <button
                             onClick={() => copyToClipboard(message.text.replace(/<[^>]*>?/gm, ''), message.id)}
                             className="text-xs opacity-60 hover:opacity-100 transition-opacity"
-                            title="Copy to clipboard"
+                            title="Salin ke clipboard"
                           >
                             {copiedMessageId === message.id ? (
                               <FiCheck size={14} className="text-green-500" />
@@ -1298,7 +1283,7 @@ and extremely friendly and very human little bit emoticon and get straight to th
                 <div className="w-5 h-5 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center mr-2 shadow">
                   <span className="text-2xs text-white">AI</span>
                 </div>
-                <span className="text-xs font-medium">Processing</span>
+                <span className="text-xs font-medium">Memproses</span>
               </div>
               
               <div className="space-y-2 mt-2">
@@ -1354,7 +1339,7 @@ and extremely friendly and very human little bit emoticon and get straight to th
           exit={{ opacity: 0, y: 20 }}
           whileHover={{ scale: 1.1 }}
           whileTap={{ scale: 0.9 }}
-          title="Scroll to bottom"
+          title="Scroll ke bawah"
         >
           <FiChevronDown size={20} className="text-white" />
         </motion.button>
@@ -1367,19 +1352,31 @@ and extremely friendly and very human little bit emoticon and get straight to th
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: 20 }}
           transition={{ type: "spring", damping: 25 }}
-          className={`absolute right-3 top-14 ${themeClasses.cardBg} rounded-xl shadow-xl z-20 ${themeClasses.border} w-72`}
+          className={`absolute right-3 top-14 ${themeClasses.cardBg} rounded-xl shadow-xl z-20 ${themeClasses.border} w-80`}
         >
           <div className={`p-3 ${themeClasses.border} flex justify-between items-center`}>
             <h4 className="font-medium text-sm flex items-center">
-              <FiCpu className="mr-2" size={14} /> Memory Context
+              <FiCpu className="mr-2" size={14} /> Konteks Memori
             </h4>
             <div className="flex items-center space-x-2">
+              <div className="relative">
+                <select
+                  value={memoryImportanceFilter}
+                  onChange={(e) => setMemoryImportanceFilter(e.target.value)}
+                  className={`text-xs ${themeClasses.bgTertiary} hover:${themeClasses.bgSecondary} px-2 py-1 rounded-lg transition-colors appearance-none pr-6 ${themeClasses.textPrimary}`}
+                >
+                  <option value="all">Semua Memori</option>
+                  <option value="important">Penting</option>
+                  <option value="normal">Normal</option>
+                </select>
+                <FiChevronDown size={12} className="absolute right-2 top-2 pointer-events-none" />
+              </div>
               <button 
                 onClick={autoSaveToMemory}
                 disabled={messages.length === 0}
                 className={`text-xs ${themeClasses.bgTertiary} hover:${themeClasses.bgSecondary} px-2 py-1 rounded-lg transition-colors disabled:opacity-50`}
               >
-                Remember
+                Ingat
               </button>
               <button 
                 onClick={() => setShowMemoryPanel(false)}
@@ -1391,32 +1388,82 @@ and extremely friendly and very human little bit emoticon and get straight to th
           </div>
           
           <div className="max-h-72 overflow-y-auto scrollbar-thin text-sm">
-            {memories.length === 0 ? (
+            {filteredMemories.length === 0 ? (
               <div className="p-4 text-center text-sm">
-                No memories yet. Important context will appear here.
+                Belum ada memori. Konteks penting akan muncul di sini.
               </div>
             ) : (
               <div className={`divide-y ${themeClasses.border}`}>
-                {memories.map((memory) => (
+                {filteredMemories.map((memory) => (
                   <div key={memory.id} className={`p-3 hover:${themeClasses.bgTertiary} transition-colors group`}>
                     <div className="flex justify-between items-start">
-                      <p className="text-xs break-words pr-2">{memory.summary}</p>
-                      <button
-                        onClick={() => deleteMemory(memory.id)}
-                        className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 text-xs transition-opacity"
-                      >
-                        <FiTrash2 size={14} />
-                      </button>
-                    </div>
-                    <p className="text-xs mt-1">{memory.context.date}</p>
-                    {memory.context.tags.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {memory.context.tags.map(tag => (
-                          <span key={tag} className="text-xs bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded-full">
-                            {tag}
-                          </span>
-                        ))}
+                      <div className="flex-1">
+                        <div className="flex items-start">
+                          <p className="text-xs break-words pr-2">{memory.summary}</p>
+                          {memory.context.importance >= 4 && (
+                            <FiStar className="text-yellow-400 flex-shrink-0 mt-0.5" size={12} />
+                          )}
+                        </div>
+                        <p className="text-xs mt-1">{memory.context.date}</p>
+                        {memory.context.tags.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {memory.context.tags.map(tag => (
+                              <span key={tag} className="text-xs bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded-full">
+                                {tag}
+                              </span>
+                            ))}
+                          </div>
+                        )}
                       </div>
+                      <div className="flex space-x-1">
+                        <button
+                          onClick={() => setShowMemoryDetails(showMemoryDetails === memory.id ? null : memory.id)}
+                          className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-blue-500 text-xs transition-opacity"
+                          title="Detail"
+                        >
+                          <FiInfo size={14} />
+                        </button>
+                        <button
+                          onClick={() => deleteMemory(memory.id)}
+                          className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 text-xs transition-opacity"
+                          title="Hapus"
+                        >
+                          <FiTrash2 size={14} />
+                        </button>
+                      </div>
+                    </div>
+                    
+                    {showMemoryDetails === memory.id && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        transition={{ duration: 0.2 }}
+                        className={`mt-2 pt-2 border-t ${themeClasses.border}`}
+                      >
+                        <div className="flex items-center text-xs mb-1">
+                          <span className="font-medium mr-2">Detail:</span>
+                          <span className="flex items-center">
+                            <span className="w-2 h-2 rounded-full bg-blue-500 mr-1"></span>
+                            {memory.context.language === 'indonesia' ? 'Bahasa Indonesia' : 'English'}
+                          </span>
+                          <span className="mx-2">•</span>
+                          <span className="flex items-center">
+                            <FiStar className="mr-1" size={12} />
+                            Penting: {memory.context.importance}/5
+                          </span>
+                        </div>
+                        <div className="text-xs max-h-40 overflow-y-auto bg-gray-900 bg-opacity-20 rounded p-2">
+                          {memory.messages.slice(0, 4).map((msg, idx) => (
+                            <p key={idx} className="mb-1">
+                              <span className="font-medium">{msg.isBot ? 'Orion' : 'Anda'}:</span> {msg.text.replace(/<[^>]*>?/gm, '').substring(0, 100)}...
+                            </p>
+                          ))}
+                          {memory.messages.length > 4 && (
+                            <p className="text-xs text-gray-500">+ {memory.messages.length - 4} pesan lainnya</p>
+                          )}
+                        </div>
+                      </motion.div>
                     )}
                   </div>
                 ))}
@@ -1488,7 +1535,7 @@ and extremely friendly and very human little bit emoticon and get straight to th
             className={`text-xs px-3 py-1 mb-1 rounded-full inline-flex items-center ${searchMode === 'deep' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'}`}
           >
             <FiGlobe size={12} className="mr-1" />
-            {searchMode === 'deep' ? 'Deep Web Search' : 'Web Search'} enabled
+            {searchMode === 'deep' ? 'Pencarian Web Mendalam' : 'Pencarian Web'} aktif
             <button 
               onClick={() => setSearchMode(false)}
               className="ml-2 text-current hover:text-red-500"
@@ -1514,7 +1561,7 @@ and extremely friendly and very human little bit emoticon and get straight to th
                 handleSendMessage(inputMessage, pendingFiles);
               }
             }}
-            placeholder="Type your message..."
+            placeholder="Ketik pesan Anda..."
             className={`w-full ${themeClasses.inputBg} ${themeClasses.inputBorder} rounded-xl px-4 py-3 pr-12 focus:outline-none focus:border-transparent resize-none overflow-hidden transition-all duration-300 text-sm ${themeClasses.inputText}`}
             rows={1}
             style={{ minHeight: '48px', maxHeight: '120px' }}
@@ -1541,7 +1588,7 @@ and extremely friendly and very human little bit emoticon and get straight to th
                 searchMode === 'shallow' ? 'bg-blue-500 text-white' : 
                 themeClasses.hoverBg
               }`}
-              title={searchMode ? `Search mode: ${searchMode}` : 'Enable web search'}
+              title={searchMode ? `Mode pencarian: ${searchMode}` : 'Aktifkan pencarian web'}
               whileHover={{ scale: 1.2 }}
               whileTap={{ scale: 0.9 }}
             >
@@ -1552,7 +1599,7 @@ and extremely friendly and very human little bit emoticon and get straight to th
               <motion.button
                 onClick={stopGeneration}
                 className="p-1.5 rounded-full bg-red-500 hover:bg-red-600 text-white transition-all shadow"
-                title="Stop generation"
+                title="Hentikan generasi"
                 whileHover={{ scale: 1.2 }}
                 whileTap={{ scale: 0.9 }}
               >
@@ -1563,7 +1610,7 @@ and extremely friendly and very human little bit emoticon and get straight to th
                 <motion.button
                   onClick={() => setShowFileOptions(!showFileOptions)}
                   className={`p-1.5 rounded-full transition-all ${showFileOptions ? `${themeClasses.bgTertiary}` : themeClasses.hoverBg}`}
-                  title="Attach files"
+                  title="Lampirkan file"
                   whileHover={{ scale: 1.2 }}
                   whileTap={{ scale: 0.9 }}
                 >
@@ -1583,7 +1630,7 @@ and extremely friendly and very human little bit emoticon and get straight to th
                     rotate: (inputMessage.trim() || pendingFiles.length > 0) ? 6 : 0
                   }}
                   whileTap={{ scale: 0.9 }}
-                  title="Send message"
+                  title="Kirim pesan"
                 >
                   <RiSendPlaneFill size={18} />
                 </motion.button>
@@ -1606,7 +1653,7 @@ and extremely friendly and very human little bit emoticon and get straight to th
                 className={`cursor-pointer p-2 rounded-lg transition-all ${themeClasses.hoverBg}`}
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.95 }}
-                title="Upload image"
+                title="Unggah gambar"
               >
                 <input
                   type="file"
@@ -1621,7 +1668,7 @@ and extremely friendly and very human little bit emoticon and get straight to th
                 className={`cursor-pointer p-2 rounded-lg transition-all ${themeClasses.hoverBg}`}
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.95 }}
-                title="Upload file"
+                title="Unggah file"
               >
                 <input
                   type="file"
