@@ -1,12 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import PropTypes from 'prop-types';
-import DOMPurify from 'dompurify';
 import { motion, AnimatePresence } from 'framer-motion';
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { 
   FiCopy, FiSend, FiPlus, FiX, FiImage, FiFile, FiTrash2, 
-  FiClock, FiCpu, FiSettings, FiZap, FiStopCircle, FiMessageSquare,
-  FiSun, FiMoon, FiSearch, FiDatabase, FiAward
+  FiCpu, FiZap, FiStopCircle, FiMessageSquare,
+  FiSun, FiMoon, FiSearch, FiDatabase, FiAward, FiChevronDown,
+  FiUser, FiCode, FiHelpCircle, FiLightbulb
 } from 'react-icons/fi';
 
 const ChatBot = () => {
@@ -24,16 +23,18 @@ const ChatBot = () => {
   const [isProMode, setIsProMode] = useState(false);
   const [abortController, setAbortController] = useState(null);
   const [showChatHistory, setShowChatHistory] = useState(false);
-  const [darkMode, setDarkMode] = useState(false);
+  const [darkMode, setDarkMode] = useState(true);
   const [fileProcessing, setFileProcessing] = useState(false);
   const [processingSources, setProcessingSources] = useState([]);
+  const [expandedRoomId, setExpandedRoomId] = useState(null);
+  
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
   const chatContainerRef = useRef(null);
   const messageCountRef = useRef(0);
 
   // Initialize Google Generative AI
-  const genAI = new GoogleGenerativeAI("AIzaSyDSTgkkROL7mjaGKoD2vnc8l2UptNCbvHk");
+  const genAI = new GoogleGenerativeAI("YOUR_API_KEY");
   const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
   // Load data from localStorage
@@ -57,8 +58,7 @@ const ChatBot = () => {
     if (savedProMode) setIsProMode(savedProMode === 'true');
     if (savedDarkMode) setDarkMode(savedDarkMode === 'true');
     
-    // Create initial room if none exists
-    if (!savedCurrentRoom && (!savedChatRooms || JSON.parse(savedChatRooms).length === 0)) {
+    if (!savedCurrentRoom && (!savedChatRooms || JSON.parse(savedChatRooms).length === 0) {
       createNewChatRoom();
     }
   }, []);
@@ -87,7 +87,7 @@ const ChatBot = () => {
   const createNewChatRoom = () => {
     const newRoom = {
       id: Date.now().toString(),
-      name: `Chat ${new Date().toLocaleTimeString()}`,
+      name: `New Chat ${chatRooms.length + 1}`,
       messages: [],
       history: [],
       createdAt: new Date().toISOString()
@@ -152,14 +152,12 @@ const ChatBot = () => {
 
   const extractTextFromFile = async (file) => {
     if (file.type.startsWith('image/')) {
-      // For images, we'll use OCR simulation (in a real app, you'd use Tesseract.js or similar)
       return new Promise((resolve) => {
         setTimeout(() => {
           resolve("Extracted text from image (simulated OCR result)");
         }, 1500);
       });
     } else if (file.type === 'application/pdf') {
-      // For PDFs, simulate text extraction
       return new Promise((resolve) => {
         setTimeout(() => {
           resolve("Extracted text from PDF document (simulated result)");
@@ -169,7 +167,6 @@ const ChatBot = () => {
                file.type.includes('document') || 
                file.name.endsWith('.txt') || 
                file.name.endsWith('.docx')) {
-      // For text files
       return new Promise((resolve) => {
         const reader = new FileReader();
         reader.onload = (e) => resolve(e.target.result);
@@ -181,13 +178,13 @@ const ChatBot = () => {
 
   const summarizeConversation = async (conversation) => {
     try {
-      const prompt = `Buat ringkasan sangat singkat sepadat padatnya (maks 1 kalimat) dari percakapan ini dalam bahasa yang sama dengan percakapan. Fokus pada fakta kunci, keputusan, dan detail penting. HILANGKAN semua salam dan basa-basi.\n\nPercakapan:\n${conversation}`;
+      const prompt = `Create a very brief summary (1 sentence max) of this conversation in the same language. Focus on key facts, decisions, and important details. REMOVE all greetings and small talk.\n\nConversation:\n${conversation}`;
       const result = await model.generateContent(prompt);
       const response = await result.response.text();
-      return response.replace(/[{}]/g, '').replace(/json/gi, '').replace(/```/g, '').trim() || "Ringkasan tidak tersedia";
+      return response.replace(/[{}]/g, '').replace(/json/gi, '').replace(/```/g, '').trim() || "Summary unavailable";
     } catch (error) {
       console.error("Error summarizing conversation:", error);
-      return "Tidak bisa membuat ringkasan";
+      return "Could not create summary";
     }
   };
 
@@ -196,14 +193,14 @@ const ChatBot = () => {
     
     try {
       const memoryTexts = memories.map(m => `[Memory ${m.date}]: ${m.summary}`).join('\n');
-      const prompt = `Daftar memori:\n${memoryTexts}\n\nPertanyaan: "${query}"\n\nIdentifikasi hanya memori yang paling relevan dengan pertanyaan (maks 3). Berikan hanya ID memori yang dipisahkan koma, atau kosong jika tidak ada yang relevan.`;
+      const prompt = `Memory list:\n${memoryTexts}\n\nQuery: "${query}"\n\nIdentify only the most relevant memories (max 3). Return only memory IDs separated by commas, or empty if none are relevant.`;
       
       const result = await model.generateContent(prompt);
       const response = await result.response.text();
       const relevantIds = response.trim().split(',').map(id => id.trim()).filter(Boolean);
       
       return memories.filter(m => relevantIds.includes(m.id))
-        .map(m => `[Memory ${m.date}]: ${m.summary}\nDetail: ${m.messages.map(msg => `${msg.isBot ? 'Orion' : 'User'}: ${msg.text.replace(/<[^>]*>?/gm, '')}`).join('\n')}`)
+        .map(m => `[Memory ${m.date}]: ${m.summary}\nDetails: ${m.messages.map(msg => `${msg.isBot ? 'AI' : 'User'}: ${msg.text.replace(/<[^>]*>?/gm, '')}`).join('\n')}`)
         .join('\n\n');
     } catch (error) {
       console.error("Error finding relevant memories:", error);
@@ -216,10 +213,10 @@ const ChatBot = () => {
     
     try {
       setIsBotTyping(true);
-      const conversationText = messages.map(msg => `${msg.isBot ? 'Orion' : 'User'}: ${msg.text}`).join('\n');
+      const conversationText = messages.map(msg => `${msg.isBot ? 'AI' : 'User'}: ${msg.text}`).join('\n');
       const summary = await summarizeConversation(conversationText);
       
-      if (summary && !summary.includes("tidak bisa")) {
+      if (summary && !summary.includes("could not")) {
         const newMemory = {
           id: Date.now().toString(),
           summary,
@@ -244,43 +241,37 @@ const ChatBot = () => {
       return;
     }
     
-    // Split text into chunks for smoother animation
     const words = fullText.split(' ');
     let displayedText = '';
     
     for (let i = 0; i < words.length; i++) {
       if (abortController?.signal.aborted) break;
       
-      // Add next 3-7 words (random for more natural feel)
       const chunkSize = Math.floor(Math.random() * 5) + 3;
       const chunk = words.slice(i, i + chunkSize).join(' ');
       displayedText += (i === 0 ? '' : ' ') + chunk;
       
-      // Apply blur effect during typing
       const blurredText = `<span style="filter: blur(0.5px); opacity: 0.8;">${displayedText}</span>`;
       callback(blurredText);
       i += chunkSize - 1;
       
-      // Smooth scrolling during typing
       const isNearBottom = chatContainerRef.current.scrollHeight - chatContainerRef.current.scrollTop - chatContainerRef.current.clientHeight < 100;
       if (isNearBottom) {
         scrollToBottom('smooth');
       }
       
-      // Random typing speed for more natural feel
       await new Promise(resolve => setTimeout(resolve, Math.random() * 50 + 50));
     }
     
-    // Remove blur effect when done
     callback(fullText);
   };
 
   const enhanceWithProMode = async (initialResponse, prompt) => {
     const enhancementPrompts = [
-      `Expand this response significantly with extreme detailed examples and explanations:\n\n${initialResponse}`,
+      `Expand this response significantly with detailed examples and explanations:\n\n${initialResponse}`,
       `Add comprehensive technical details, use cases, and potential variations to:\n\n${initialResponse}`,
-      `Provide multiple perspectives, edge cases, and practical applications and add Very lot of data in internet for:\n\n${initialResponse}`,
-      `Create an extremely detailed final version incorporating all previous enhancements and add more data for super extremly detail and perfect for:\n\n${initialResponse}`
+      `Provide multiple perspectives, edge cases, and practical applications for:\n\n${initialResponse}`,
+      `Create an extremely detailed final version incorporating all previous enhancements for:\n\n${initialResponse}`
     ];
     
     let enhancedResponse = initialResponse;
@@ -288,7 +279,6 @@ const ChatBot = () => {
     for (let i = 0; i < enhancementPrompts.length; i++) {
       if (abortController?.signal.aborted) break;
       
-      // Show processing animation
       setProcessingSources(prev => [
         ...prev,
         {
@@ -307,7 +297,6 @@ const ChatBot = () => {
         console.error(`Error in enhancement step ${i + 1}:`, error);
       }
       
-      // Update progress in UI
       setProcessingSources(prev => 
         prev.map((source, idx) => 
           idx === i 
@@ -342,7 +331,6 @@ const ChatBot = () => {
     const timeoutId = setTimeout(() => controller.abort(), 300000);
 
     try {
-      // Add user message to chat history
       const userMessage = { role: 'user', content: trimmedMessage };
       const updatedHistory = [...chatHistory, userMessage];
       setChatHistory(updatedHistory);
@@ -358,7 +346,6 @@ const ChatBot = () => {
           const fileMessage = createMessageObject(`File: ${file.name}`, false, 0, file);
           setMessages(prev => [...prev, fileMessage]);
           
-          // Extract text from file if possible
           const fileContent = await extractTextFromFile(file);
           const contentMessage = createMessageObject(`Extracted content from ${file.name}:\n${fileContent}`, false);
           setMessages(prev => [...prev, contentMessage]);
@@ -377,33 +364,25 @@ const ChatBot = () => {
         textareaRef.current.style.height = 'auto';
       }
 
-      // Scroll to show the sent message at the top
       setTimeout(() => {
         scrollToBottom('smooth');
       }, 50);
 
       const startTime = Date.now();
 
-      // Find relevant memories using AI
       const relevantMemories = await findRelevantMemories(trimmedMessage);
       
-      // Combine chat history into prompt
       const contextMessages = updatedHistory.slice(-15).map(msg => {
-        return msg.role === 'user' ? `User: ${msg.content}` : `Orion: ${msg.content}`;
+        return msg.role === 'user' ? `User: ${msg.content}` : `AI: ${msg.content}`;
       }).join('\n');
 
       const fullPrompt = `${
-        relevantMemories ? `Konteks Memori Relevan:\n${relevantMemories}\n\n` : ''
-      }Percakapan Saat Ini:\n${contextMessages}\n\nUser: "${trimmedMessage}". 
-      Respond as Orion in natural language and follow user language and extremely friendly and very human little bit emoticon and get straight to the point.S,
-      focuse to user comfort. Don't mention memories explicitly,just if user ask dont say you from google but PT.Orion Digital Platforms from indonesia dont show thos too usualy just if user asked,
-      just incorporate relevant context naturally, it all is back process dont show in chat. Be ${
-        isProMode ? 'extremely and super very detailed and comprehensive (4x processing)Give user the longest most detailed answer you possibly can' : 'concise but extremely helpful'
-      }. For coding, provide complete solutions with proper formatting. Always maintain context.${
-        isProMode ? ' Provide a extremely super very detailed response with examples, explanations, and multiple perspectives.' : ''
+        relevantMemories ? `Relevant Memory Context:\n${relevantMemories}\n\n` : ''
+      }Current Conversation:\n${contextMessages}\n\nUser: "${trimmedMessage}". 
+      Respond naturally in the user's language. Be friendly and human-like. ${
+        isProMode ? 'Provide an extremely detailed response with examples, explanations, and multiple perspectives.' : 'Be concise but helpful'
       }`;
 
-      // Create initial message object for bot response
       const messageId = Date.now().toString();
       currentMessageId.current = messageId;
       
@@ -416,7 +395,6 @@ const ChatBot = () => {
         file: null
       }]);
 
-      // Show processing animation for Pro Mode
       if (isProMode) {
         setProcessingSources([
           { id: '1', text: 'Analyzing question', icon: <FiSearch />, completed: false },
@@ -428,11 +406,8 @@ const ChatBot = () => {
 
       let botResponse;
       if (isProMode) {
-        // Get initial response
         const initialResult = await model.generateContent(fullPrompt);
         const initialResponse = await initialResult.response.text();
-        
-        // Enhance with Pro Mode processing
         botResponse = await enhanceWithProMode(initialResponse, fullPrompt);
       } else {
         const result = await model.generateContent(fullPrompt);
@@ -442,14 +417,12 @@ const ChatBot = () => {
       const processedResponse = processSpecialChars(botResponse);
       const duration = Date.now() - startTime;
 
-      // Update the message with final response
       setMessages(prev => prev.map(msg => 
         msg.id === messageId 
           ? { ...msg, text: processedResponse, duration } 
           : msg
       ));
 
-      // Type out the message with animation (only in normal mode)
       if (!isProMode) {
         await typeMessage(processedResponse, (typedText) => {
           setMessages(prev => prev.map(msg => 
@@ -458,18 +431,16 @@ const ChatBot = () => {
         });
       }
 
-      // Add bot response to chat history
       const botMessage = { role: 'assistant', content: botResponse };
       const newChatHistory = [...updatedHistory, botMessage];
       setChatHistory(newChatHistory);
 
-      // Auto-save to memory every 2 messages
       await autoSaveToMemory();
 
     } catch (error) {
       const errorMessage = error.name === 'AbortError' 
         ? 'Response stopped by user'
-        : 'Waduh, ada yang salah nih sama Orion! Gak konek ke servernya...';
+        : 'Sorry, something went wrong with the AI service...';
       
       setMessages(prev => [...prev, createMessageObject(errorMessage, true)]);
     } finally {
@@ -487,11 +458,9 @@ const ChatBot = () => {
   };
 
   const processSpecialChars = (text) => {
-    // Process lists first
     const withLists = text.replace(/^\s*[\*\-+]\s+(.+)/gm, '<li>$1</li>')
       .replace(/(<li>.*<\/li>)+/g, (match) => `<ul>${match}</ul>`);
     
-    // Process code blocks
     const codeBlockRegex = /```(\w+)?\n([\s\S]*?)\n```/g;
     const withCodeBlocks = withLists.replace(codeBlockRegex, (match, language, code) => {
       const cleanCode = code.replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -506,7 +475,6 @@ const ChatBot = () => {
       </div>`;
     });
 
-    // Process other markdown
     return withCodeBlocks
       .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
       .replace(/\*(.*?)\*/g, '<em>$1</em>')
@@ -548,27 +516,34 @@ const ChatBot = () => {
     localStorage.setItem('orionProMode', newProMode.toString());
   };
 
-  // Theme classes
+  const toggleExpandRoom = (roomId) => {
+    setExpandedRoomId(expandedRoomId === roomId ? null : roomId);
+  };
+
+  // Modern theme classes
   const themeClasses = darkMode ? {
-    bgPrimary: 'bg-gray-900',
-    bgSecondary: 'bg-gray-800',
-    bgTertiary: 'bg-gray-700',
+    bgPrimary: 'bg-gray-950',
+    bgSecondary: 'bg-gray-900',
+    bgTertiary: 'bg-gray-800',
     textPrimary: 'text-gray-100',
     textSecondary: 'text-gray-300',
     textTertiary: 'text-gray-400',
-    border: 'border-gray-700',
-    hoverBg: 'hover:bg-gray-700',
-    inputBg: 'bg-gray-800',
-    inputBorder: 'border-gray-700',
+    border: 'border-gray-800',
+    hoverBg: 'hover:bg-gray-800',
+    inputBg: 'bg-gray-900',
+    inputBorder: 'border-gray-800',
     inputText: 'text-gray-100',
-    buttonBg: 'bg-blue-700',
-    buttonHover: 'hover:bg-blue-600',
+    buttonBg: 'bg-blue-600',
+    buttonHover: 'hover:bg-blue-500',
     buttonText: 'text-white',
-    cardBg: 'bg-gray-800',
-    codeBg: 'bg-gray-900',
-    codeBorder: 'border-gray-700',
+    cardBg: 'bg-gray-900',
+    codeBg: 'bg-gray-950',
+    codeBorder: 'border-gray-800',
     codeText: 'text-gray-100',
-    typingDot: 'bg-gray-400'
+    typingDot: 'bg-gray-400',
+    proModeBg: 'bg-gradient-to-r from-purple-600 to-blue-600',
+    userMessageBg: 'bg-gray-800',
+    aiMessageBg: 'bg-gradient-to-br from-blue-600 to-indigo-700'
   } : {
     bgPrimary: 'bg-gray-50',
     bgSecondary: 'bg-white',
@@ -588,7 +563,10 @@ const ChatBot = () => {
     codeBg: 'bg-gray-50',
     codeBorder: 'border-gray-200',
     codeText: 'text-gray-800',
-    typingDot: 'bg-gray-500'
+    typingDot: 'bg-gray-500',
+    proModeBg: 'bg-gradient-to-r from-purple-500 to-blue-500',
+    userMessageBg: 'bg-gray-100',
+    aiMessageBg: 'bg-gradient-to-br from-blue-500 to-indigo-600'
   };
 
   return (
@@ -601,9 +579,9 @@ const ChatBot = () => {
             className={`p-1.5 rounded-full ${themeClasses.hoverBg} transition-colors`}
             title="Chat history"
           >
-            <FiMessageSquare size={16} className={themeClasses.textSecondary} />
+            <FiMessageSquare size={18} className={themeClasses.textSecondary} />
           </button>
-          <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow">
+          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center shadow">
             <span className="text-white text-xs font-bold">AI</span>
           </div>
           <div>
@@ -618,7 +596,7 @@ const ChatBot = () => {
                 </span>
               ) : (
                 <span className="flex items-center">
-                  <span className="w-1.5 h-1.5 bg-green-500 rounded-full mr-1"></span>
+                  <span className="w-2 h-2 bg-green-500 rounded-full mr-1"></span>
                   Online {isProMode && <span className="ml-1 text-blue-400">(Pro Mode)</span>}
                 </span>
               )}
@@ -631,28 +609,28 @@ const ChatBot = () => {
             className={`p-1.5 rounded-full transition-colors ${themeClasses.hoverBg}`}
             title={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
           >
-            {darkMode ? <FiSun size={16} className="text-yellow-300" /> : <FiMoon size={16} />}
+            {darkMode ? <FiSun size={18} className="text-yellow-300" /> : <FiMoon size={18} />}
           </button>
           <button 
             onClick={toggleProMode}
-            className={`p-1.5 rounded-full transition-colors ${isProMode ? 'bg-blue-100 text-blue-600' : themeClasses.hoverBg}`}
+            className={`p-1.5 rounded-full transition-colors ${isProMode ? `${themeClasses.proModeBg} text-white` : themeClasses.hoverBg}`}
             title={isProMode ? 'Disable Pro Mode' : 'Enable Pro Mode'}
           >
-            <FiZap size={16} className={isProMode ? "text-yellow-500" : ""} />
+            <FiZap size={18} className={isProMode ? "text-yellow-200" : ""} />
           </button>
           <button 
             onClick={() => setShowMemoryPanel(!showMemoryPanel)}
             className={`p-1.5 rounded-full transition-colors ${showMemoryPanel ? `${themeClasses.bgTertiary} ${themeClasses.textPrimary}` : themeClasses.hoverBg}`}
             title="Memory"
           >
-            <FiCpu size={16} />
+            <FiCpu size={18} />
           </button>
           <button
             onClick={createNewChatRoom}
             className={`p-1.5 rounded-full ${themeClasses.hoverBg} transition-colors`}
             title="New Chat"
           >
-            <FiPlus size={16} />
+            <FiPlus size={18} />
           </button>
         </div>
       </div>
@@ -672,11 +650,11 @@ const ChatBot = () => {
               onClick={() => setShowChatHistory(false)}
               className={`p-1 ${themeClasses.textSecondary} hover:${themeClasses.textPrimary}`}
             >
-              <FiX size={16} />
+              <FiX size={18} />
             </button>
           </div>
           
-          <div className="max-h-96 overflow-y-auto scrollbar-thin text-sm">
+          <div className="max-h-[calc(100vh-180px)] overflow-y-auto scrollbar-thin text-sm">
             {chatRooms.length === 0 ? (
               <div className="p-4 text-center text-sm">
                 No chat history yet
@@ -686,30 +664,57 @@ const ChatBot = () => {
                 {chatRooms.map((room) => (
                   <div 
                     key={room.id} 
-                    className={`p-3 hover:${themeClasses.bgTertiary} transition-colors cursor-pointer group ${room.id === currentRoomId ? `${themeClasses.bgTertiary}` : ''}`}
+                    className={`p-3 hover:${themeClasses.bgTertiary} transition-colors cursor-pointer ${room.id === currentRoomId ? `${themeClasses.bgTertiary}` : ''}`}
                     onClick={() => switchChatRoom(room.id)}
                   >
                     <div className="flex justify-between items-start">
                       <p className="text-xs font-medium break-words pr-2">
                         {room.name}
                       </p>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          deleteChatRoom(room.id);
-                        }}
-                        className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 text-xs transition-opacity"
-                      >
-                        <FiTrash2 size={14} />
-                      </button>
+                      <div className="flex space-x-1">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleExpandRoom(room.id);
+                          }}
+                          className="text-gray-400 hover:text-gray-500 text-xs"
+                        >
+                          {expandedRoomId === room.id ? <FiChevronUp size={14} /> : <FiChevronDown size={14} />}
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            deleteChatRoom(room.id);
+                          }}
+                          className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-red-500 text-xs transition-opacity"
+                        >
+                          <FiTrash2 size={14} />
+                        </button>
+                      </div>
                     </div>
-                    <p className="text-xs mt-1">
+                    <p className="text-xs mt-1 text-gray-400">
                       {new Date(room.createdAt).toLocaleString()}
                     </p>
-                    {room.messages.length > 0 && (
-                      <p className="text-xs mt-1 truncate">
-                        {room.messages[room.messages.length - 1].text.replace(/<[^>]*>?/gm, '').substring(0, 50)}...
-                      </p>
+                    {expandedRoomId === room.id && room.messages.length > 0 && (
+                      <div className="mt-2 text-xs space-y-1 max-h-40 overflow-y-auto">
+                        {room.messages.slice(-3).map((msg, idx) => (
+                          <div key={idx} className={`p-2 rounded-lg ${msg.isBot ? themeClasses.aiMessageBg + ' text-white' : themeClasses.userMessageBg}`}>
+                            <div className="flex items-center mb-1">
+                              {msg.isBot ? (
+                                <div className="w-4 h-4 rounded-full bg-white/20 flex items-center justify-center mr-2">
+                                  <span className="text-2xs">AI</span>
+                                </div>
+                              ) : (
+                                <FiUser size={12} className="mr-2" />
+                              )}
+                              <span className="font-medium text-xs">{msg.isBot ? 'AI' : 'You'}</span>
+                            </div>
+                            <p className="text-xs truncate">
+                              {msg.text.replace(/<[^>]*>?/gm, '').substring(0, 60)}...
+                            </p>
+                          </div>
+                        ))}
+                      </div>
                     )}
                   </div>
                 ))}
@@ -722,123 +727,131 @@ const ChatBot = () => {
       {/* Chat Area */}
       <div 
         ref={chatContainerRef}
-        className={`flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-gray-500 scrollbar-track-transparent ${themeClasses.bgPrimary}`}
-        style={{ display: 'flex', flexDirection: 'column-reverse' }}
+        className={`flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin ${themeClasses.bgPrimary}`}
       >
-        <div style={{ display: 'flex', flexDirection: 'column' }}>
-          {/* Messages in reverse order */}
-          {messages.length === 0 && (
-            <div className="flex flex-col items-center justify-center h-full pb-16">
-              <div className="w-16 h-16 mb-4 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg">
-                <span className="text-2xl text-white">AI</span>
-              </div>
-              <h3 className="text-xl font-semibold text-center mb-1">
-                Hello, I'm Orion😘!
-              </h3>
-              <p className="text-center mb-6 max-w-md text-sm">
-                Your AI assistant with automatic memory. Ask me anything.
-              </p>
-              
-              {showTemplateButtons && (
-                <div className="grid grid-cols-2 gap-3 w-full max-w-md">
-                  <button
-                    onClick={() => handleTemplateButtonClick("Hello Orion! How are you today?")}
-                    className={`${themeClasses.cardBg} hover:${themeClasses.bgTertiary} ${themeClasses.border} rounded-xl p-3 text-sm transition-all hover:shadow-sm text-left`}
-                  >
-                    <span className="font-medium">Say hello</span>
-                    <p className="text-xs mt-1">Start a conversation</p>
-                  </button>
-                  <button
-                    onClick={() => handleTemplateButtonClick("Brainstorm some creative ideas for my project about...")}
-                    className={`${themeClasses.cardBg} hover:${themeClasses.bgTertiary} ${themeClasses.border} rounded-xl p-3 text-sm transition-all hover:shadow-sm text-left`}
-                  >
-                    <span className="font-medium">Brainstorm ideas</span>
-                    <p className="text-xs mt-1">Get creative suggestions</p>
-                  </button>
-                  <button
-                    onClick={() => handleTemplateButtonClick("Explain how machine learning works in simple terms")}
-                    className={`${themeClasses.cardBg} hover:${themeClasses.bgTertiary} ${themeClasses.border} rounded-xl p-3 text-sm transition-all hover:shadow-sm text-left`}
-                  >
-                    <span className="font-medium">Explain something</span>
-                    <p className="text-xs mt-1">Get clear explanations</p>
-                  </button>
-                  <button
-                    onClick={() => handleTemplateButtonClick("Help me debug this code...")}
-                    className={`${themeClasses.cardBg} hover:${themeClasses.bgTertiary} ${themeClasses.border} rounded-xl p-3 text-sm transition-all hover:shadow-sm text-left`}
-                  >
-                    <span className="font-medium">Code help</span>
-                    <p className="text-xs mt-1">Debug or explain code</p>
-                  </button>
-                </div>
-              )}
+        {messages.length === 0 && (
+          <div className="flex flex-col items-center justify-center h-full pb-16">
+            <div className="w-20 h-20 mb-6 rounded-full bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center shadow-lg">
+              <span className="text-3xl text-white">AI</span>
             </div>
-          )}
-
-          <AnimatePresence>
-            {messages.map((message) => (
-              <motion.div
-                key={message.id}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -8 }}
-                transition={{ duration: 0.2, ease: "easeOut" }}
-                className={`flex ${message.isBot ? 'justify-start' : 'justify-end'}`}
-              >
-                <div className={`max-w-[90%] md:max-w-[80%] ${message.isBot ? 
-                  `${themeClasses.cardBg} ${themeClasses.border}` : 
-                  'bg-gradient-to-br from-blue-600 to-blue-500 text-white'} rounded-2xl p-3 shadow-xs`}
+            <h3 className="text-2xl font-semibold text-center mb-2">
+              Hello, I'm Orion AI
+            </h3>
+            <p className="text-center mb-8 max-w-md text-gray-400">
+              Your intelligent assistant with automatic memory. Ask me anything.
+            </p>
+            
+            {showTemplateButtons && (
+              <div className="grid grid-cols-2 gap-3 w-full max-w-md">
+                <button
+                  onClick={() => handleTemplateButtonClick("Hello! How are you today?")}
+                  className={`${themeClasses.cardBg} hover:${themeClasses.bgTertiary} ${themeClasses.border} rounded-xl p-3 text-sm transition-all hover:shadow-sm text-left group`}
                 >
-                  {message.isBot && (
-                    <div className="flex items-center mb-1">
-                      <div className="w-5 h-5 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center mr-2 shadow">
-                        <span className="text-2xs text-white">AI</span>
-                      </div>
-                      <span className="text-xs font-medium">Orion</span>
+                  <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center mb-2 group-hover:bg-blue-200 transition-colors">
+                    <FiMessageSquare size={16} />
+                  </div>
+                  <span className="font-medium">Say hello</span>
+                  <p className="text-xs mt-1 text-gray-400">Start a conversation</p>
+                </button>
+                <button
+                  onClick={() => handleTemplateButtonClick("Brainstorm some creative ideas for my project about...")}
+                  className={`${themeClasses.cardBg} hover:${themeClasses.bgTertiary} ${themeClasses.border} rounded-xl p-3 text-sm transition-all hover:shadow-sm text-left group`}
+                >
+                  <div className="w-8 h-8 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center mb-2 group-hover:bg-purple-200 transition-colors">
+                    <FiLightbulb size={16} />
+                  </div>
+                  <span className="font-medium">Brainstorm</span>
+                  <p className="text-xs mt-1 text-gray-400">Get creative ideas</p>
+                </button>
+                <button
+                  onClick={() => handleTemplateButtonClick("Explain how machine learning works in simple terms")}
+                  className={`${themeClasses.cardBg} hover:${themeClasses.bgTertiary} ${themeClasses.border} rounded-xl p-3 text-sm transition-all hover:shadow-sm text-left group`}
+                >
+                  <div className="w-8 h-8 rounded-full bg-green-100 text-green-600 flex items-center justify-center mb-2 group-hover:bg-green-200 transition-colors">
+                    <FiHelpCircle size={16} />
+                  </div>
+                  <span className="font-medium">Explain</span>
+                  <p className="text-xs mt-1 text-gray-400">Get clear explanations</p>
+                </button>
+                <button
+                  onClick={() => handleTemplateButtonClick("Help me debug this code...")}
+                  className={`${themeClasses.cardBg} hover:${themeClasses.bgTertiary} ${themeClasses.border} rounded-xl p-3 text-sm transition-all hover:shadow-sm text-left group`}
+                >
+                  <div className="w-8 h-8 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center mb-2 group-hover:bg-orange-200 transition-colors">
+                    <FiCode size={16} />
+                  </div>
+                  <span className="font-medium">Code help</span>
+                  <p className="text-xs mt-1 text-gray-400">Debug or explain code</p>
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        <AnimatePresence>
+          {messages.map((message) => (
+            <motion.div
+              key={message.id}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.2, ease: "easeOut" }}
+              className={`flex ${message.isBot ? 'justify-start' : 'justify-end'}`}
+            >
+              <div className={`max-w-[90%] md:max-w-[80%] ${message.isBot ? 
+                `${themeClasses.aiMessageBg} text-white` : 
+                `${themeClasses.userMessageBg} ${themeClasses.textPrimary}`} rounded-2xl p-4 shadow-xs`}
+              >
+                {message.isBot && (
+                  <div className="flex items-center mb-2">
+                    <div className="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center mr-2">
+                      <span className="text-2xs">AI</span>
                     </div>
-                  )}
-                  
-                  {message.file ? (
-                    <div>
-                      <p className={`text-xs mb-1 ${message.isBot ? themeClasses.textTertiary : 'text-blue-100'}`}>File: {message.file.name}</p>
-                      {message.file.type.startsWith('image/') && (
-                        <img 
-                          src={URL.createObjectURL(message.file)} 
-                          alt="Uploaded" 
-                          className="mt-1 max-w-full h-auto rounded-lg border border-gray-200 shadow-sm" 
-                        />
-                      )}
-                    </div>
-                  ) : (
-                    <div 
-                      className={`text-sm ${message.isBot ? themeClasses.textPrimary : 'text-white'}`}
-                      dangerouslySetInnerHTML={{ __html: message.text }} 
-                    />
-                  )}
-                  
-                  <div className="flex items-center justify-between mt-1">
-                    <span className={`text-xs ${message.isBot ? themeClasses.textTertiary : 'text-blue-100'}`}>
-                      {message.time}
-                      {message.isBot && message.duration > 0 && (
-                        <span> • {(message.duration / 1000).toFixed(1)}s</span>
-                      )}
-                    </span>
-                    
-                    {message.isBot && (
-                      <button
-                        onClick={() => copyToClipboard(message.text.replace(/<[^>]*>?/gm, ''))}
-                        className="text-xs opacity-60 hover:opacity-100 transition-opacity ml-2"
-                        title="Copy to clipboard"
-                      >
-                        <FiCopy size={14} />
-                      </button>
+                    <span className="text-xs font-medium">Orion AI</span>
+                  </div>
+                )}
+                
+                {message.file ? (
+                  <div>
+                    <p className={`text-xs mb-1 ${message.isBot ? 'text-blue-100' : themeClasses.textTertiary}`}>File: {message.file.name}</p>
+                    {message.file.type.startsWith('image/') && (
+                      <img 
+                        src={URL.createObjectURL(message.file)} 
+                        alt="Uploaded" 
+                        className="mt-1 max-w-full h-auto rounded-lg border border-gray-200 shadow-sm" 
+                      />
                     )}
                   </div>
+                ) : (
+                  <div 
+                    className={`text-sm ${message.isBot ? 'text-white' : themeClasses.textPrimary}`}
+                    dangerouslySetInnerHTML={{ __html: message.text }} 
+                  />
+                )}
+                
+                <div className="flex items-center justify-between mt-2">
+                  <span className={`text-xs ${message.isBot ? 'text-blue-100' : themeClasses.textTertiary}`}>
+                    {message.time}
+                    {message.isBot && message.duration > 0 && (
+                      <span> • {(message.duration / 1000).toFixed(1)}s</span>
+                    )}
+                  </span>
+                  
+                  {message.isBot && (
+                    <button
+                      onClick={() => copyToClipboard(message.text.replace(/<[^>]*>?/gm, ''))}
+                      className="text-xs opacity-60 hover:opacity-100 transition-opacity ml-2"
+                      title="Copy to clipboard"
+                    >
+                      <FiCopy size={14} />
+                    </button>
+                  )}
                 </div>
-              </motion.div>
-            ))}
-          </AnimatePresence>
-          <div ref={messagesEndRef} />
-        </div>
+              </div>
+            </motion.div>
+          ))}
+        </AnimatePresence>
+        <div ref={messagesEndRef} />
       </div>
 
       {/* Memory Panel */}
@@ -889,7 +902,7 @@ const ChatBot = () => {
                         <FiTrash2 size={14} />
                       </button>
                     </div>
-                    <p className="text-xs mt-1">{memory.date}</p>
+                    <p className="text-xs mt-1 text-gray-400">{memory.date}</p>
                   </div>
                 ))}
               </div>
@@ -898,7 +911,7 @@ const ChatBot = () => {
         </motion.div>
       )}
 
-      {/* Typing Indicator (Bottom Right) */}
+      {/* Typing Indicator */}
       {(isBotTyping || fileProcessing) && (
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -939,7 +952,6 @@ const ChatBot = () => {
               </button>
             </div>
 
-            {/* Processing sources for Pro Mode */}
             {isProMode && processingSources.length > 0 && (
               <div className="mt-2 pt-2 border-t border-gray-200">
                 <div className="grid grid-cols-2 gap-2">
@@ -1013,7 +1025,7 @@ const ChatBot = () => {
               }
             }}
             placeholder="Type your message..."
-            className={`w-full ${themeClasses.inputBg} ${themeClasses.inputBorder} rounded-xl px-4 py-3 pr-12 focus:outline-none focus:border-transparent resize-none overflow-hidden transition-all duration-200 text-sm ${themeClasses.inputText}`}
+            className={`w-full ${themeClasses.inputBg} ${themeClasses.inputBorder} rounded-xl px-4 py-3 pr-12 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none overflow-hidden transition-all duration-200 text-sm ${themeClasses.inputText}`}
             rows={1}
             style={{ minHeight: '48px', maxHeight: '120px' }}
           />
@@ -1110,7 +1122,6 @@ const ChatBot = () => {
       </div>
       
       <style jsx global>{`
-        /* Modern Typing Animation */
         .typing-dot {
           display: inline-block;
           width: 8px;
@@ -1119,7 +1130,6 @@ const ChatBot = () => {
           background-color: currentColor;
         }
 
-        /* Enhanced Code Container */
         .code-container {
           background: ${darkMode ? '#1e293b' : '#f8fafc'};
           border-radius: 12px;
@@ -1134,7 +1144,6 @@ const ChatBot = () => {
           transform: translateY(-2px);
         }
 
-        /* Sleek Code Toolbar */
         .code-toolbar {
           display: flex;
           justify-content: space-between;
@@ -1146,7 +1155,6 @@ const ChatBot = () => {
           border-bottom: 1px solid ${darkMode ? '#334155' : '#e2e8f0'};
         }
 
-        /* Modern Language Tag */
         .language-tag {
           background: ${darkMode ? '#334155' : '#e2e8f0'};
           padding: 0.3em 0.8em;
@@ -1157,7 +1165,6 @@ const ChatBot = () => {
           transition: all 0.2s ease;
         }
 
-        /* Improved Copy Button */
         .copy-button {
           background: transparent;
           border: 1px solid ${darkMode ? '#475569' : '#cbd5e1'};
@@ -1180,7 +1187,6 @@ const ChatBot = () => {
           transform: translateY(0);
         }
 
-        /* Refined Code Block */
         .code-block {
           margin: 0;
           padding: 1em;
@@ -1206,7 +1212,6 @@ const ChatBot = () => {
           font-variant-ligatures: contextual;
         }
 
-        /* Smoother Notification */
         .copy-notification {
           position: fixed;
           bottom: 24px;
@@ -1230,7 +1235,6 @@ const ChatBot = () => {
           to { opacity: 0; }
         }
 
-        /* Enhanced Prose Styles */
         .prose {
           max-width: 100%;
           font-size: 0.95rem;
