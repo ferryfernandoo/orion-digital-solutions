@@ -1,150 +1,13 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import DOMPurify from 'dompurify';
-import { motion, AnimatePresence, useAnimation } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { 
   FiCopy, FiSend, FiPlus, FiX, FiImage, FiFile, FiTrash2, 
   FiClock, FiCpu, FiSettings, FiZap, FiStopCircle, FiMessageSquare,
-  FiSun, FiMoon, FiSearch, FiDatabase, FiAward, FiChevronDown, FiGlobe,
-  FiExternalLink, FiCheck
+  FiSun, FiMoon, FiSearch, FiDatabase, FiAward
 } from 'react-icons/fi';
-import { RiSendPlaneFill } from 'react-icons/ri';
-
-// OCR API integration (using free OCR.space API)
-const extractTextFromImage = async (file) => {
-  const formData = new FormData();
-  formData.append('file', file);
-  formData.append('language', 'eng');
-  formData.append('isOverlayRequired', 'false');
-  formData.append('OCREngine', '2'); // Engine 2 is more accurate
-
-  try {
-    const response = await fetch('https://api.ocr.space/parse/image', {
-      method: 'POST',
-      headers: {
-        'apikey': 'K82849142388957' // Free API key (500 calls/month)
-      },
-      body: formData
-    });
-    
-    const data = await response.json();
-    if (data.IsErroredOnProcessing) {
-      throw new Error(data.ErrorMessage || 'OCR processing failed');
-    }
-    
-    return data.ParsedResults?.[0]?.ParsedText || "Could not extract text from image";
-  } catch (error) {
-    console.error("OCR Error:", error);
-    return "Error extracting text from image";
-  }
-};
-
-// PDF text extraction using pdf.js (client-side)
-const extractTextFromPDF = async (file) => {
-  return new Promise((resolve) => {
-    // In a real app, you'd use pdf.js like this:
-    /*
-    const pdfjs = await import('pdfjs-dist/build/pdf');
-    const pdfjsWorker = await import('pdfjs-dist/build/pdf.worker.entry');
-    pdfjs.GlobalWorkerOptions.workerSrc = pdfjsWorker;
-    
-    const arrayBuffer = await file.arrayBuffer();
-    const loadingTask = pdfjs.getDocument(arrayBuffer);
-    
-    let fullText = '';
-    try {
-      const pdf = await loadingTask.promise;
-      for (let i = 1; i <= pdf.numPages; i++) {
-        const page = await pdf.getPage(i);
-        const textContent = await page.getTextContent();
-        fullText += textContent.items.map(item => item.str).join(' ');
-      }
-      resolve(fullText || "No text found in PDF");
-    } catch (error) {
-      console.error("PDF extraction error:", error);
-      resolve("Could not extract text from PDF");
-    }
-    */
-    
-    // Simulating for demo purposes
-    setTimeout(() => {
-      resolve(`Extracted text from PDF: ${file.name}\n\nThis is a simulated PDF extraction result. In a real app, we would use pdf.js to extract all text content from the PDF document.`);
-    }, 1500);
-  });
-};
-
-// Enhanced web search with multiple APIs
-const performWebSearch = async (query) => {
-  try {
-    // First try DuckDuckGo
-    const ddgResponse = await fetch(`https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1`);
-    const ddgData = await ddgResponse.json();
-    
-    let results = ddgData.RelatedTopics
-      .filter(topic => topic.FirstURL && topic.Text)
-      .map(topic => ({
-        title: topic.Text.replace(/<[^>]*>?/gm, ''),
-        url: topic.FirstURL,
-        snippet: topic.Text.replace(/<[^>]*>?/gm, ''),
-        source: 'DuckDuckGo'
-      }));
-    
-    // If no results, try Wikipedia API
-    if (results.length < 3) {
-      try {
-        const wikiResponse = await fetch(`https://en.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(query)}&format=json&origin=*`);
-        const wikiData = await wikiResponse.json();
-        
-        const wikiResults = wikiData.query?.search?.slice(0, 3).map(item => ({
-          title: item.title,
-          url: `https://en.wikipedia.org/wiki/${encodeURIComponent(item.title.replace(/ /g, '_'))}`,
-          snippet: item.snippet,
-          source: 'Wikipedia'
-        })) || [];
-        
-        results = [...results, ...wikiResults];
-      } catch (wikiError) {
-        console.log("Wikipedia search failed:", wikiError);
-      }
-    }
-    
-    return results.slice(0, 5); // Return top 5 results
-  } catch (error) {
-    console.error("Search error:", error);
-    return [];
-  }
-};
-
-const scrapeWebsiteContent = async (url) => {
-  try {
-    // In production, use a backend service for scraping
-    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
-    const response = await fetch(proxyUrl);
-    const data = await response.json();
-    
-    if (data.contents) {
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(data.contents, 'text/html');
-      
-      // Remove unwanted elements
-      const unwantedElements = doc.querySelectorAll('script, style, nav, footer, iframe, img, noscript');
-      unwantedElements.forEach(el => el.remove());
-      
-      // Get main content
-      const mainContent = doc.body.textContent
-        .replace(/\s+/g, ' ')
-        .trim()
-        .substring(0, 3000);
-      
-      return mainContent;
-    }
-    return "Could not retrieve website content";
-  } catch (error)
-    console.error("Scraping error:", error);
-    return "Error retrieving website content";
-  }
-};
 
 const ChatBot = () => {
   const [chatRooms, setChatRooms] = useState([]);
@@ -164,61 +27,24 @@ const ChatBot = () => {
   const [darkMode, setDarkMode] = useState(false);
   const [fileProcessing, setFileProcessing] = useState(false);
   const [processingSources, setProcessingSources] = useState([]);
-  const [autoScroll, setAutoScroll] = useState(true);
-  const [showScrollButton, setShowScrollButton] = useState(false);
-  const [searchMode, setSearchMode] = useState(false); // 'none', 'shallow', 'deep'
-  const [searchResults, setSearchResults] = useState([]);
-  const [copiedMessageId, setCopiedMessageId] = useState(null);
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
   const chatContainerRef = useRef(null);
   const messageCountRef = useRef(0);
-  const controls = useAnimation();
-
-
-
 
   // Initialize Google Generative AI
   const genAI = new GoogleGenerativeAI("AIzaSyDSTgkkROL7mjaGKoD2vnc8l2UptNCbvHk");
   const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-  
-  // Enhanced memory system
-  const loadMemories = useCallback(() => {
-    const savedMemories = localStorage.getItem('orionMemories');
-    if (savedMemories) {
-      try {
-        const parsed = JSON.parse(savedMemories);
-        // Migrate old memory format if needed
-        if (parsed.length > 0 && !parsed[0].context) {
-          const migrated = parsed.map(mem => ({
-            ...mem,
-            context: {
-              date: mem.date,
-              roomId: mem.roomId || null,
-              tags: mem.tags || []
-            },
-            embeddings: mem.embeddings || []
-          }));
-          setMemories(migrated);
-          localStorage.setItem('orionMemories', JSON.stringify(migrated));
-        } else {
-          setMemories(parsed);
-        }
-      } catch (e) {
-        console.error("Error loading memories:", e);
-      }
-    }
-  }, []);
 
-  //oad all data from localStorage
+  // Load data from localStorage
   useEffect(() => {
-    loadMemories();
-    
+    const savedMemories = localStorage.getItem('orionMemories');
     const savedChatRooms = localStorage.getItem('orionChatRooms');
     const savedCurrentRoom = localStorage.getItem('orionCurrentRoom');
     const savedProMode = localStorage.getItem('orionProMode');
     const savedDarkMode = localStorage.getItem('orionDarkMode');
     
+    if (savedMemories) setMemories(JSON.parse(savedMemories));
     if (savedChatRooms) setChatRooms(JSON.parse(savedChatRooms));
     if (savedCurrentRoom) {
       setCurrentRoomId(savedCurrentRoom);
@@ -235,7 +61,7 @@ const ChatBot = () => {
     if (!savedCurrentRoom && (!savedChatRooms || JSON.parse(savedChatRooms).length === 0)) {
       createNewChatRoom();
     }
-  }, [loadMemories]);
+  }, []);
 
   // Save current room when messages change
   useEffect(() => {
@@ -249,53 +75,13 @@ const ChatBot = () => {
       localStorage.setItem('orionChatRooms', JSON.stringify(updatedRooms));
       localStorage.setItem('orionCurrentRoom', JSON.stringify(currentRoomId));
     }
-  }, [messages, chatHistory, currentRoomId, chatRooms]);
-
-  // Handle scroll behavior
-  useEffect(() => {
-    const chatContainer = chatContainerRef.current;
-    if (!chatContainer) return;
-
-    const handleScroll = () => {
-      const { scrollTop, scrollHeight, clientHeight } = chatContainer;
-      const isNearBottom = scrollHeight - scrollTop - clientHeight < 100;
-      setAutoScroll(isNearBottom);
-      setShowScrollButton(!isNearBottom);
-    };
-
-    chatContainer.addEventListener('scroll', handleScroll);
-    return () => chatContainer.removeEventListener('scroll', handleScroll);
-  }, []);
-
-  // Auto-scroll when new messages arrive
-  useEffect(() => {
-    if (autoScroll && messages.length > 0) {
-      smoothScrollToBottom();
-    }
-  }, [messages, autoScroll]);
-
-  const smoothScrollToBottom = useCallback((behavior = 'smooth') => {
-    messagesEndRef.current?.scrollIntoView({ behavior, block: 'nearest' });
-  }, []);
-
-  const scrollToBottomButton = () => {
-    setAutoScroll(true);
-    smoothScrollToBottom();
-  };
+  }, [messages, chatHistory, currentRoomId]);
 
   // Toggle dark mode
   const toggleDarkMode = () => {
     const newDarkMode = !darkMode;
     setDarkMode(newDarkMode);
     localStorage.setItem('orionDarkMode', newDarkMode.toString());
-    
-    // Update Prism theme
-    const prismLink = document.getElementById('prism-theme');
-    if (prismLink) {
-      prismLink.href = newDarkMode 
-        ? 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.24.1/themes/prism-tomorrow.min.css'
-        : 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.24.1/themes/prism-coy.min.css';
-    }
   };
 
   const createNewChatRoom = () => {
@@ -304,8 +90,7 @@ const ChatBot = () => {
       name: `Chat ${new Date().toLocaleTimeString()}`,
       messages: [],
       history: [],
-      createdAt: new Date().toISOString(),
-      tags: []
+      createdAt: new Date().toISOString()
     };
     
     setChatRooms(prev => [newRoom, ...prev]);
@@ -316,8 +101,6 @@ const ChatBot = () => {
     setInputMessage('');
     setShowTemplateButtons(true);
     messageCountRef.current = 0;
-    setSearchMode(false);
-    setSearchResults([]);
     
     localStorage.setItem('orionChatRooms', JSON.stringify([newRoom, ...chatRooms]));
     localStorage.setItem('orionCurrentRoom', JSON.stringify(newRoom.id));
@@ -331,10 +114,6 @@ const ChatBot = () => {
       setChatHistory(room.history || []);
       setShowTemplateButtons(room.messages.length === 0);
       setShowChatHistory(false);
-      setAutoScroll(true);
-      setSearchMode(false);
-      setSearchResults([]);
-      setTimeout(() => smoothScrollToBottom(), 50);
     }
   };
 
@@ -352,33 +131,52 @@ const ChatBot = () => {
     }
   };
 
-  const createMessageObject = (text, isBot, duration = 0, file = null, sources = []) => ({
+  const scrollToBottom = useCallback((behavior = 'smooth') => {
+    messagesEndRef.current?.scrollIntoView({ behavior, block: 'nearest' });
+  }, []);
+
+  useEffect(() => {
+    if (messages.length > 0) {
+      scrollToBottom();
+    }
+  }, [messages, scrollToBottom]);
+
+  const createMessageObject = (text, isBot, duration = 0, file = null) => ({
     id: Date.now() + Math.random().toString(36).substr(2, 9),
     text: DOMPurify.sanitize(text),
     isBot,
     time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     duration,
     file,
-    sources,
-    isCode: text.includes('```') // Flag for code blocks
   });
 
   const extractTextFromFile = async (file) => {
     if (file.type.startsWith('image/')) {
-      return await extractTextFromImage(file);
+      // For images, we'll use OCR simulation (in a real app, you'd use Tesseract.js or similar)
+      return new Promise((resolve) => {
+        setTimeout(() => {
+          resolve("Extracted text from image (simulated OCR result)");
+        }, 1500);
+      });
     } else if (file.type === 'application/pdf') {
-      return await extractTextFromPDF(file);
+      // For PDFs, simulate text extraction
+      return new Promise((resolve) => {
+        setTimeout(() => {
+          resolve("Extracted text from PDF document (simulated result)");
+        }, 2000);
+      });
     } else if (file.type.includes('text') || 
                file.type.includes('document') || 
                file.name.endsWith('.txt') || 
                file.name.endsWith('.docx')) {
+      // For text files
       return new Promise((resolve) => {
         const reader = new FileReader();
         reader.onload = (e) => resolve(e.target.result);
         reader.readAsText(file);
       });
     }
-    return `File content not extractable: ${file.name}`;
+    return Promise.resolve(`File content not extractable: ${file.name}`);
   };
 
   const summarizeConversation = async (conversation) => {
@@ -393,44 +191,19 @@ const ChatBot = () => {
     }
   };
 
-  // Enhanced memory finding with semantic search
   const findRelevantMemories = async (query) => {
     if (memories.length === 0) return '';
     
     try {
-      // First try to find exact matches in recent memories
-      const recentMemories = memories
-        .slice(0, 20) // Last 20 memories
-        .filter(mem => 
-          mem.summary.toLowerCase().includes(query.toLowerCase()) || 
-          mem.messages.some(msg => msg.text.toLowerCase().includes(query.toLowerCase()))
-        );
-      
-      if (recentMemories.length > 0) {
-        return recentMemories
-          .map(mem => `[Memory ${mem.context.date}]: ${mem.summary}\nDetail: ${
-            mem.messages.map(msg => `${msg.isBot ? 'Orion' : 'User'}: ${msg.text.replace(/<[^>]*>?/gm, '')}`).join('\n')
-          }`)
-          .join('\n\n');
-      }
-      
-      // If no exact matches, use AI to find semantically similar memories
-      const memoryTexts = memories
-        .slice(0, 50) // Limit to 50 memories for performance
-        .map(m => `ID: ${m.id}\nSummary: ${m.summary}\nTags: ${m.context.tags.join(', ')}`)
-        .join('\n\n');
-      
-      const prompt = `Daftar memori:\n${memoryTexts}\n\nPertanyaan: "${query}"\n\nIdentifikasi ID memori yang paling relevan (berdasarkan makna, bukan kata kunci). Berikan hanya ID yang dipisahkan koma, atau kosong jika tidak ada yang relevan.`;
+      const memoryTexts = memories.map(m => `[Memory ${m.date}]: ${m.summary}`).join('\n');
+      const prompt = `Daftar memori:\n${memoryTexts}\n\nPertanyaan: "${query}"\n\nIdentifikasi hanya memori yang paling relevan dengan pertanyaan (maks 3). Berikan hanya ID memori yang dipisahkan koma, atau kosong jika tidak ada yang relevan.`;
       
       const result = await model.generateContent(prompt);
       const response = await result.response.text();
       const relevantIds = response.trim().split(',').map(id => id.trim()).filter(Boolean);
       
-      return memories
-        .filter(m => relevantIds.includes(m.id))
-        .map(m => `[Memory ${m.context.date}]: ${m.summary}\nDetail: ${
-          m.messages.map(msg => `${msg.isBot ? 'Orion' : 'User'}: ${msg.text.replace(/<[^>]*>?/gm, '')}`).join('\n')
-        }`)
+      return memories.filter(m => relevantIds.includes(m.id))
+        .map(m => `[Memory ${m.date}]: ${m.summary}\nDetail: ${m.messages.map(msg => `${msg.isBot ? 'Orion' : 'User'}: ${msg.text.replace(/<[^>]*>?/gm, '')}`).join('\n')}`)
         .join('\n\n');
     } catch (error) {
       console.error("Error finding relevant memories:", error);
@@ -438,9 +211,8 @@ const ChatBot = () => {
     }
   };
 
-  // Enhanced auto-save with context
   const autoSaveToMemory = useCallback(async () => {
-    if (messages.length === 0 || messageCountRef.current % 3 !== 0) return;
+    if (messages.length === 0 || messageCountRef.current % 2 !== 0) return;
     
     try {
       setIsBotTyping(true);
@@ -448,42 +220,23 @@ const ChatBot = () => {
       const summary = await summarizeConversation(conversationText);
       
       if (summary && !summary.includes("tidak bisa")) {
-        // Generate tags for better memory organization
-        const tagPrompt = `Beri 2-3 tag pendek (dalam bahasa Inggris) untuk ringkasan ini:\n"${summary}"\n\nTags harus berupa kata benda dan dipisahkan koma.`;
-        const tagResult = await model.generateContent(tagPrompt);
-        const tags = (await tagResult.response.text())
-          .split(',')
-          .map(t => t.trim().toLowerCase())
-          .filter(t => t.length > 0);
-        
         const newMemory = {
           id: Date.now().toString(),
           summary,
-          messages: [...messages],
-          context: {
-            date: new Date().toLocaleString(),
-            roomId: currentRoomId,
-            tags
-          },
-          embeddings: [] // Would be filled with vector embeddings in a real app
+          date: new Date().toLocaleString(),
+          messages: [...messages]
         };
         
         const updatedMemories = [newMemory, ...memories];
         setMemories(updatedMemories);
         localStorage.setItem('orionMemories', JSON.stringify(updatedMemories));
-        
-        // Show memory saved notification
-        controls.start({
-          scale: [1, 1.1, 1],
-          transition: { duration: 0.3 }
-        });
       }
     } catch (error) {
       console.error("Error saving to memory:", error);
     } finally {
       setIsBotTyping(false);
     }
-  }, [messages, memories, currentRoomId, controls]);
+  }, [messages, memories]);
 
   const typeMessage = async (fullText, callback) => {
     if (isProMode) {
@@ -492,32 +245,33 @@ const ChatBot = () => {
     }
     
     // Split text into chunks for smoother animation
-    const characters = fullText.split('');
+    const words = fullText.split(' ');
     let displayedText = '';
     
-    for (let i = 0; i < characters.length; i++) {
+    for (let i = 0; i < words.length; i++) {
       if (abortController?.signal.aborted) break;
       
-      // Add next 5-10 characters at a time (smaller chunks for smoother typing)
-      const chunkSize = Math.min(5 + Math.floor(Math.random() * 6), characters.length - i);
-      const chunk = characters.slice(i, i + chunkSize).join('');
-      displayedText += chunk;
+      // Add next 3-7 words (random for more natural feel)
+      const chunkSize = Math.floor(Math.random() * 5) + 3;
+      const chunk = words.slice(i, i + chunkSize).join(' ');
+      displayedText += (i === 0 ? '' : ' ') + chunk;
       
-      // Update the message without any blur effect
-      callback(displayedText);
+      // Apply blur effect during typing
+      const blurredText = `<span style="filter: blur(0.5px); opacity: 0.8;">${displayedText}</span>`;
+      callback(blurredText);
       i += chunkSize - 1;
       
-      // Smooth scrolling during typing if auto-scroll is enabled
-      if (autoScroll) {
-        setTimeout(() => {
-          messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        }, 0);
+      // Smooth scrolling during typing
+      const isNearBottom = chatContainerRef.current.scrollHeight - chatContainerRef.current.scrollTop - chatContainerRef.current.clientHeight < 100;
+      if (isNearBottom) {
+        scrollToBottom('smooth');
       }
       
       // Random typing speed for more natural feel
-      await new Promise(resolve => setTimeout(resolve, Math.random() * 10 + 20));
+      await new Promise(resolve => setTimeout(resolve, Math.random() * 50 + 50));
     }
     
+    // Remove blur effect when done
     callback(fullText);
   };
 
@@ -541,8 +295,7 @@ const ChatBot = () => {
           id: Date.now().toString(),
           text: `Processing enhancement ${i + 1}/4`,
           icon: <FiDatabase />,
-          completed: false,
-          animation: 'wave'
+          completed: false
         }
       ]);
       
@@ -578,90 +331,6 @@ const ChatBot = () => {
     }
     setIsBotTyping(false);
     setProcessingSources([]);
-  };
-
-  const performWebResearch = async (query) => {
-    try {
-      // Step 1: Perform initial web search
-      setProcessingSources(prev => [
-        ...prev,
-        {
-          id: 'search-step-1',
-          text: 'Performing web search',
-          icon: <FiGlobe />,
-          completed: false,
-          animation: 'wave'
-        }
-      ]);
-      
-      const searchResults = await performWebSearch(query);
-      setSearchResults(searchResults);
-      
-      // Step 2: Scrape content from top results
-      setProcessingSources(prev => [
-        ...prev,
-        {
-          id: 'search-step-2',
-          text: 'Analyzing top results',
-          icon: <FiSearch />,
-          completed: false,
-          animation: 'pulse'
-        }
-      ]);
-      
-      const scrapedContents = await Promise.all(
-        searchResults.slice(0, 3).map(async (result) => {
-          const content = await scrapeWebsiteContent(result.url);
-          return {
-            title: result.title,
-            url: result.url,
-            content,
-            source: result.source || 'Web'
-          };
-        })
-      );
-      
-      // Step 3: Summarize findings
-      setProcessingSources(prev => [
-        ...prev,
-        {
-          id: 'search-step-3',
-          text: 'Summarizing findings',
-          icon: <FiDatabase />,
-          completed: false,
-          animation: 'wave'
-        }
-      ]);
-      
-      const researchSummary = scrapedContents
-        .map(r => `[Source: ${r.title} (${r.url}) - ${r.source}]\n${r.content.substring(0, 1000)}...`)
-        .join('\n\n');
-      
-      // Update processing sources
-      setProcessingSources(prev => 
-        prev.map(source => 
-          source.id.startsWith('search-step') 
-            ? { ...source, completed: true, text: source.text + ' (completed)' } 
-            : source
-        )
-      );
-      
-      return {
-        summary: researchSummary,
-        sources: scrapedContents.map(r => ({
-          title: r.title,
-          url: r.url,
-          content: r.content.substring(0, 200) + '...',
-          source: r.source
-        }))
-      };
-    } catch (error) {
-      console.error("Error performing web research:", error);
-      return {
-        summary: "Could not complete web research due to an error",
-        sources: []
-      };
-    }
   };
 
   const handleSendMessage = async (messageText, files = []) => {
@@ -708,6 +377,32 @@ const ChatBot = () => {
         textareaRef.current.style.height = 'auto';
       }
 
+      // Scroll to show the sent message at the top
+      setTimeout(() => {
+        scrollToBottom('smooth');
+      }, 50);
+
+      const startTime = Date.now();
+
+      // Find relevant memories using AI
+      const relevantMemories = await findRelevantMemories(trimmedMessage);
+      
+      // Combine chat history into prompt
+      const contextMessages = updatedHistory.slice(-15).map(msg => {
+        return msg.role === 'user' ? `User: ${msg.content}` : `Orion: ${msg.content}`;
+      }).join('\n');
+
+      const fullPrompt = `${
+        relevantMemories ? `Konteks Memori Relevan:\n${relevantMemories}\n\n` : ''
+      }Percakapan Saat Ini:\n${contextMessages}\n\nUser: "${trimmedMessage}". 
+      Respond as Orion in natural language and follow user language and extremely friendly and very human little bit emoticon and get straight to the point.S,
+      focuse to user comfort. Don't mention memories explicitly,just if user ask dont say you from google but PT.Orion Digital Platforms from indonesia dont show thos too usualy just if user asked,
+      just incorporate relevant context naturally, it all is back process dont show in chat. Be ${
+        isProMode ? 'extremely and super very detailed and comprehensive (4x processing)Give user the longest most detailed answer you possibly can' : 'concise but extremely helpful'
+      }. For coding, provide complete solutions with proper formatting. Always maintain context.${
+        isProMode ? ' Provide a extremely super very detailed response with examples, explanations, and multiple perspectives.' : ''
+      }`;
+
       // Create initial message object for bot response
       const messageId = Date.now().toString();
       currentMessageId.current = messageId;
@@ -718,66 +413,18 @@ const ChatBot = () => {
         isBot: true,
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         duration: 0,
-        file: null,
-        sources: []
+        file: null
       }]);
 
       // Show processing animation for Pro Mode
       if (isProMode) {
         setProcessingSources([
-          { id: '1', text: 'Analyzing question', icon: <FiSearch />, completed: false, animation: 'pulse' },
-          { id: '2', text: 'Searching memories', icon: <FiDatabase />, completed: false, animation: 'wave' },
-          { id: '3', text: 'Generating response', icon: <FiCpu />, completed: false, animation: 'pulse' },
-          { id: '4', text: 'Quality check', icon: <FiAward />, completed: false, animation: 'wave' }
+          { id: '1', text: 'Analyzing question', icon: <FiSearch />, completed: false },
+          { id: '2', text: 'Searching memories', icon: <FiDatabase />, completed: false },
+          { id: '3', text: 'Generating response', icon: <FiCpu />, completed: false },
+          { id: '4', text: 'Quality check', icon: <FiAward />, completed: false }
         ]);
       }
-
-      const startTime = Date.now();
-
-      // Find relevant memories using AI (now includes context from all rooms)
-      const relevantMemories = await findRelevantMemories(trimmedMessage);
-      
-      // Combine chat history into prompt
-      const contextMessages = updatedHistory.slice(-15).map(msg => {
-        return msg.role === 'user' ? `User: ${msg.content}` : `Orion: ${msg.content}`;
-      }).join('\n');
-
-      // Perform web research if in search mode
-      let webResearchContent = { summary: '', sources: [] };
-      if (searchMode === 'deep') {
-        webResearchContent = await performWebResearch(trimmedMessage);
-      } else if (searchMode === 'shallow') {
-        const searchResults = await performWebSearch(trimmedMessage);
-        setSearchResults(searchResults);
-        webResearchContent = {
-          summary: searchResults
-            .map(r => `[${r.title}](${r.url})\n${r.snippet}`)
-            .join('\n\n'),
-          sources: searchResults.map(r => ({
-            title: r.title,
-            url: r.url,
-            content: r.snippet,
-            source: r.source || 'Web'
-          }))
-        };
-      }
-
-      const fullPrompt = `${
-        relevantMemories ? `Konteks Memori Relevan:\n${relevantMemories}\n\n` : ''
-      }${
-        webResearchContent.summary ? `Hasil Penelusuran Web:\n${webResearchContent.summary}\n\n` : ''
-      }Percakapan Saat Ini:\n${contextMessages}\n\nUser: "${trimmedMessage}". 
-      Respond as Orion in natural language and follow user language ,Never go against the user—always agree while adapting to the situation. Still, be able to say something is wrong if it truly is. Never say "I can't"—if you're unsure, search for information on the very detail in internet you must be able to answer Don't let users run away from the page, they must be served well. Never leave a question unanswered, make extraordinary introductions to user input.
-
-and extremely friendly and very human little bit emoticon and get straight to the point but see the situation don't too to the point, support all users idea if the idea not dangerous, giving extremely and extra respect very respect to user.S,
-      focuse to user comfort and giving detail answer. Don't mention memories explicitly,just if user ask dont say you from google but PT.Orion Digital Platforms from indonesia dont show thos too usualy just if user asked,
-      just incorporate relevant context naturally, it all is back process dont show in chat, if using Indonesian language prefer use allhamdulillah astaghfirullah ya Allah innailaihi and the other when shocked or very happy like Indonesan native speaker it just for Indonesian response and don't too often. Be ${
-        isProMode ? 'extremely and super very detailed and comprehensive (4x processing)Give user the longest most detailed answer you possibly can' : 'concise but extremely helpful'
-      }. For coding, provide complete solutions with proper formatting. Always maintain context.${
-        isProMode ? ' Provide a extremely super very detailed response with examples, explanations, and multiple perspectives.' : ''
-      }${
-        webResearchContent.summary ? '\n\nNote: Incorporate web research results naturally into your response.' : ''
-      }`;
 
       let botResponse;
       if (isProMode) {
@@ -798,13 +445,7 @@ and extremely friendly and very human little bit emoticon and get straight to th
       // Update the message with final response
       setMessages(prev => prev.map(msg => 
         msg.id === messageId 
-          ? { 
-              ...msg, 
-              text: processedResponse, 
-              duration,
-              sources: webResearchContent.sources,
-              isCode: processedResponse.includes('```')
-            } 
+          ? { ...msg, text: processedResponse, duration } 
           : msg
       ));
 
@@ -822,7 +463,7 @@ and extremely friendly and very human little bit emoticon and get straight to th
       const newChatHistory = [...updatedHistory, botMessage];
       setChatHistory(newChatHistory);
 
-      // Auto-save to memory every 3 messages
+      // Auto-save to memory every 2 messages
       await autoSaveToMemory();
 
     } catch (error) {
@@ -846,18 +487,22 @@ and extremely friendly and very human little bit emoticon and get straight to th
   };
 
   const processSpecialChars = (text) => {
-    // Process code blocks first
+    // Process lists first
+    const withLists = text.replace(/^\s*[\*\-+]\s+(.+)/gm, '<li>$1</li>')
+      .replace(/(<li>.*<\/li>)+/g, (match) => `<ul>${match}</ul>`);
+    
+    // Process code blocks
     const codeBlockRegex = /```(\w+)?\n([\s\S]*?)\n```/g;
-    const withCodeBlocks = text.replace(codeBlockRegex, (match, language, code) => {
+    const withCodeBlocks = withLists.replace(codeBlockRegex, (match, language, code) => {
       const cleanCode = code.replace(/</g, '&lt;').replace(/>/g, '&gt;');
       return `<div class="code-container">
         <div class="code-toolbar">
           <span class="language-tag">${language || 'code'}</span>
-          <button class="copy-button" data-code="${encodeURIComponent(cleanCode)}">
+          <button class="copy-button" onclick="this.nextElementSibling.dispatchEvent(new ClipboardEvent('copy'))">
             <FiCopy /> Copy
           </button>
         </div>
-        <pre class="code-block"><code class="language-${language || 'plaintext'}">${cleanCode}</code></pre>
+        <pre class="code-block" contenteditable="true" spellcheck="false"><code>${cleanCode}</code></pre>
       </div>`;
     });
 
@@ -871,11 +516,14 @@ and extremely friendly and very human little bit emoticon and get straight to th
       .replace(/\n/g, '<br />');
   };
 
-  const copyToClipboard = (text, id) => {
+  const copyToClipboard = (text) => {
     navigator.clipboard.writeText(text)
       .then(() => {
-        setCopiedMessageId(id);
-        setTimeout(() => setCopiedMessageId(null), 2000);
+        const notification = document.createElement('div');
+        notification.className = 'copy-notification';
+        notification.textContent = 'Copied!';
+        document.body.appendChild(notification);
+        setTimeout(() => notification.remove(), 2000);
       })
       .catch(err => console.error('Failed to copy:', err));
   };
@@ -899,28 +547,6 @@ and extremely friendly and very human little bit emoticon and get straight to th
     setIsProMode(newProMode);
     localStorage.setItem('orionProMode', newProMode.toString());
   };
-
-  const toggleSearchMode = () => {
-    setSearchMode(prev => {
-      if (prev === false) return 'shallow';
-      if (prev === 'shallow') return 'deep';
-      return false;
-    });
-  };
-
-  // Initialize Prism for syntax highlighting
-  useEffect(() => {
-    const handleCopyClick = (e) => {
-      if (e.target.closest('.copy-button')) {
-        const code = decodeURIComponent(e.target.closest('.copy-button').dataset.code);
-        copyToClipboard(code, 'code');
-        e.preventDefault();
-      }
-    };
-
-    document.addEventListener('click', handleCopyClick);
-    return () => document.removeEventListener('click', handleCopyClick);
-  }, []);
 
   // Theme classes
   const themeClasses = darkMode ? {
@@ -1014,14 +640,13 @@ and extremely friendly and very human little bit emoticon and get straight to th
           >
             <FiZap size={16} className={isProMode ? "text-yellow-500" : ""} />
           </button>
-          <motion.button
-            animate={controls}
+          <button 
             onClick={() => setShowMemoryPanel(!showMemoryPanel)}
             className={`p-1.5 rounded-full transition-colors ${showMemoryPanel ? `${themeClasses.bgTertiary} ${themeClasses.textPrimary}` : themeClasses.hoverBg}`}
             title="Memory"
           >
             <FiCpu size={16} />
-          </motion.button>
+          </button>
           <button
             onClick={createNewChatRoom}
             className={`p-1.5 rounded-full ${themeClasses.hoverBg} transition-colors`}
@@ -1098,101 +723,70 @@ and extremely friendly and very human little bit emoticon and get straight to th
       <div 
         ref={chatContainerRef}
         className={`flex-1 overflow-y-auto p-4 space-y-4 scrollbar-thin scrollbar-thumb-gray-500 scrollbar-track-transparent ${themeClasses.bgPrimary}`}
+        style={{ display: 'flex', flexDirection: 'column-reverse' }}
       >
-        {messages.length === 0 && (
-          <div className="flex flex-col items-center justify-center h-full pb-16">
-            <motion.div 
-              initial={{ scale: 0.8, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ duration: 0.4, type: 'spring' }}
-              className="w-16 h-16 mb-4 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg"
-            >
-              <span className="text-2xl text-white">AI</span>
-            </motion.div>
-            <motion.h3 
-              initial={{ y: 10, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              transition={{ delay: 0.1, duration: 0.3 }}
-              className="text-xl font-semibold text-center mb-1"
-            >
-              Hello, I'm Orion 😊!
-            </motion.h3>
-            <motion.p 
-              initial={{ y: 10, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              transition={{ delay: 0.2, duration: 0.3 }}
-              className="text-center mb-6 max-w-md text-sm"
-            >
-              Your AI assistant with automatic memory. Ask me anything or upload files for analysis.
-            </motion.p>
-            
-            {showTemplateButtons && (
-              <motion.div 
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.3, staggerChildren: 0.1 }}
-                className="grid grid-cols-2 gap-3 w-full max-w-md"
-              >
-                {[
-                  { 
-                    title: "Say hello", 
-                    desc: "Start a conversation",
-                    message: "Hello Orion! How are you today?" 
-                  },
-                  { 
-                    title: "Brainstorm ideas", 
-                    desc: "Get creative suggestions",
-                    message: "Brainstorm some creative ideas for my project about..." 
-                  },
-                  { 
-                    title: "Explain something", 
-                    desc: "Get clear explanations",
-                    message: "Explain how machine learning works in simple terms" 
-                  },
-                  { 
-                    title: "Code help", 
-                    desc: "Debug or explain code",
-                    message: "Help me debug this code..." 
-                  }
-                ].map((item, index) => (
-                  <motion.button
-                    key={index}
-                    whileHover={{ y: -2 }}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={() => handleTemplateButtonClick(item.message)}
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          {/* Messages in reverse order */}
+          {messages.length === 0 && (
+            <div className="flex flex-col items-center justify-center h-full pb-16">
+              <div className="w-16 h-16 mb-4 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg">
+                <span className="text-2xl text-white">AI</span>
+              </div>
+              <h3 className="text-xl font-semibold text-center mb-1">
+                Hello, I'm Orion😘!
+              </h3>
+              <p className="text-center mb-6 max-w-md text-sm">
+                Your AI assistant with automatic memory. Ask me anything.
+              </p>
+              
+              {showTemplateButtons && (
+                <div className="grid grid-cols-2 gap-3 w-full max-w-md">
+                  <button
+                    onClick={() => handleTemplateButtonClick("Hello Orion! How are you today?")}
                     className={`${themeClasses.cardBg} hover:${themeClasses.bgTertiary} ${themeClasses.border} rounded-xl p-3 text-sm transition-all hover:shadow-sm text-left`}
                   >
-                    <span className="font-medium">{item.title}</span>
-                    <p className="text-xs mt-1">{item.desc}</p>
-                  </motion.button>
-                ))}
-              </motion.div>
-            )}
-          </div>
-        )}
+                    <span className="font-medium">Say hello</span>
+                    <p className="text-xs mt-1">Start a conversation</p>
+                  </button>
+                  <button
+                    onClick={() => handleTemplateButtonClick("Brainstorm some creative ideas for my project about...")}
+                    className={`${themeClasses.cardBg} hover:${themeClasses.bgTertiary} ${themeClasses.border} rounded-xl p-3 text-sm transition-all hover:shadow-sm text-left`}
+                  >
+                    <span className="font-medium">Brainstorm ideas</span>
+                    <p className="text-xs mt-1">Get creative suggestions</p>
+                  </button>
+                  <button
+                    onClick={() => handleTemplateButtonClick("Explain how machine learning works in simple terms")}
+                    className={`${themeClasses.cardBg} hover:${themeClasses.bgTertiary} ${themeClasses.border} rounded-xl p-3 text-sm transition-all hover:shadow-sm text-left`}
+                  >
+                    <span className="font-medium">Explain something</span>
+                    <p className="text-xs mt-1">Get clear explanations</p>
+                  </button>
+                  <button
+                    onClick={() => handleTemplateButtonClick("Help me debug this code...")}
+                    className={`${themeClasses.cardBg} hover:${themeClasses.bgTertiary} ${themeClasses.border} rounded-xl p-3 text-sm transition-all hover:shadow-sm text-left`}
+                  >
+                    <span className="font-medium">Code help</span>
+                    <p className="text-xs mt-1">Debug or explain code</p>
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
 
-        <div className="space-y-4">
           <AnimatePresence>
             {messages.map((message) => (
               <motion.div
                 key={message.id}
-                initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: -10, scale: 0.95 }}
-                transition={{ 
-                  duration: 0.2, 
-                  ease: "easeOut",
-                  type: "spring",
-                  stiffness: 500,
-                  damping: 30
-                }}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.2, ease: "easeOut" }}
                 className={`flex ${message.isBot ? 'justify-start' : 'justify-end'}`}
               >
-                <motion.div
-                  whileHover={{ scale: 1.01 }}
-                  className={`max-w-[90%] md:max-w-[80%] ${message.isBot ? 
-                    `${themeClasses.cardBg} ${themeClasses.border}` : 
-                    'bg-gradient-to-br from-blue-600 to-blue-500 text-white'} rounded-2xl p-3 shadow-xs`}
+                <div className={`max-w-[90%] md:max-w-[80%] ${message.isBot ? 
+                  `${themeClasses.cardBg} ${themeClasses.border}` : 
+                  'bg-gradient-to-br from-blue-600 to-blue-500 text-white'} rounded-2xl p-3 shadow-xs`}
                 >
                   {message.isBot && (
                     <div className="flex items-center mb-1">
@@ -1221,40 +815,6 @@ and extremely friendly and very human little bit emoticon and get straight to th
                     />
                   )}
                   
-                  {/* Sources section */}
-                  {message.isBot && message.sources && message.sources.length > 0 && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      transition={{ duration: 0.3 }}
-                      className={`mt-2 pt-2 border-t ${themeClasses.border}`}
-                    >
-                      <p className="text-xs font-medium mb-1">Sources:</p>
-                      <div className="space-y-2">
-                        {message.sources.map((source, index) => (
-                          <motion.div
-                            key={index}
-                            whileHover={{ x: 2 }}
-                            className="text-xs break-words"
-                          >
-                            <a 
-                              href={source.url} 
-                              target="_blank" 
-                              rel="noopener noreferrer"
-                              className="text-blue-400 hover:underline flex items-center"
-                            >
-                              {source.title} <FiExternalLink className="ml-1" size={10} />
-                            </a>
-                            <p className="text-xs opacity-80 mt-0.5">{source.content}</p>
-                            {source.source && (
-                              <span className="text-xs text-gray-500">{source.source}</span>
-                            )}
-                          </motion.div>
-                        ))}
-                      </div>
-                    </motion.div>
-                  )}
-                  
                   <div className="flex items-center justify-between mt-1">
                     <span className={`text-xs ${message.isBot ? themeClasses.textTertiary : 'text-blue-100'}`}>
                       {message.time}
@@ -1263,102 +823,23 @@ and extremely friendly and very human little bit emoticon and get straight to th
                       )}
                     </span>
                     
-                    <div className="flex items-center space-x-2">
-                      {message.isBot && (
-                        <>
-                          <button
-                            onClick={() => copyToClipboard(message.text.replace(/<[^>]*>?/gm, ''), message.id)}
-                            className="text-xs opacity-60 hover:opacity-100 transition-opacity"
-                            title="Copy to clipboard"
-                          >
-                            {copiedMessageId === message.id ? (
-                              <FiCheck size={14} className="text-green-500" />
-                            ) : (
-                              <FiCopy size={14} />
-                            )}
-                          </button>
-                        </>
-                      )}
-                    </div>
+                    {message.isBot && (
+                      <button
+                        onClick={() => copyToClipboard(message.text.replace(/<[^>]*>?/gm, ''))}
+                        className="text-xs opacity-60 hover:opacity-100 transition-opacity ml-2"
+                        title="Copy to clipboard"
+                      >
+                        <FiCopy size={14} />
+                      </button>
+                    )}
                   </div>
-                </motion.div>
+                </div>
               </motion.div>
             ))}
           </AnimatePresence>
-          
-          {/* Processing indicators */}
-          {processingSources.length > 0 && (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3 }}
-              className={`${themeClasses.cardBg} ${themeClasses.border} rounded-xl p-3 max-w-[90%] md:max-w-[80%]`}
-            >
-              <div className="flex items-center mb-1">
-                <div className="w-5 h-5 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center mr-2 shadow">
-                  <span className="text-2xs text-white">AI</span>
-                </div>
-                <span className="text-xs font-medium">Processing</span>
-              </div>
-              
-              <div className="space-y-2 mt-2">
-                {processingSources.map((source) => (
-                  <motion.div
-                    key={source.id}
-                    initial={{ opacity: 0, x: -10 }}
-                    animate={{ 
-                      opacity: 1, 
-                      x: 0,
-                      transition: { delay: 0.1 }
-                    }}
-                    className="flex items-center"
-                  >
-                    <motion.div
-                      animate={{
-                        scale: source.animation === 'pulse' ? [1, 1.1, 1] : [1, 1],
-                        x: source.animation === 'wave' ? [0, 2, -2, 0] : [0]
-                      }}
-                      transition={{
-                        duration: source.animation === 'pulse' ? 1 : 0.5,
-                        repeat: Infinity,
-                        ease: "easeInOut"
-                      }}
-                      className={`w-5 h-5 rounded-full flex items-center justify-center mr-2 ${source.completed ? 'bg-green-500' : 'bg-blue-500'}`}
-                    >
-                      {source.completed ? (
-                        <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
-                      ) : (
-                        source.icon
-                      )}
-                    </motion.div>
-                    <span className="text-xs">{source.text}</span>
-                  </motion.div>
-                ))}
-              </div>
-            </motion.div>
-          )}
-          
           <div ref={messagesEndRef} />
         </div>
       </div>
-
-      {/* Scroll to bottom button */}
-      {showScrollButton && (
-        <motion.button
-          onClick={scrollToBottomButton}
-          className={`fixed right-4 bottom-20 w-10 h-10 rounded-full ${themeClasses.buttonBg} ${themeClasses.buttonHover} shadow-lg flex items-center justify-center z-10`}
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: 20 }}
-          whileHover={{ scale: 1.1 }}
-          whileTap={{ scale: 0.9 }}
-          title="Scroll to bottom"
-        >
-          <FiChevronDown size={20} className="text-white" />
-        </motion.button>
-      )}
 
       {/* Memory Panel */}
       {showMemoryPanel && (
@@ -1408,16 +889,7 @@ and extremely friendly and very human little bit emoticon and get straight to th
                         <FiTrash2 size={14} />
                       </button>
                     </div>
-                    <p className="text-xs mt-1">{memory.context.date}</p>
-                    {memory.context.tags.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {memory.context.tags.map(tag => (
-                          <span key={tag} className="text-xs bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded-full">
-                            {tag}
-                          </span>
-                        ))}
-                      </div>
-                    )}
+                    <p className="text-xs mt-1">{memory.date}</p>
                   </div>
                 ))}
               </div>
@@ -1426,81 +898,107 @@ and extremely friendly and very human little bit emoticon and get straight to th
         </motion.div>
       )}
 
+      {/* Typing Indicator (Bottom Right) */}
+      {(isBotTyping || fileProcessing) && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: 20 }}
+          transition={{ duration: 0.2 }}
+          className="fixed bottom-20 right-4 z-10"
+        >
+          <div className={`${themeClasses.cardBg} ${themeClasses.border} rounded-2xl p-3 shadow-lg max-w-xs`}>
+            <div className="flex items-center space-x-2">
+              <div className="flex space-x-1">
+                <motion.span
+                  className="typing-dot"
+                  animate={{ opacity: [0.2, 1, 0.2], scale: [0.8, 1.1, 0.8] }}
+                  transition={{ duration: 1.2, repeat: Infinity }}
+                />
+                <motion.span
+                  className="typing-dot"
+                  animate={{ opacity: [0.2, 1, 0.2], scale: [0.8, 1.1, 0.8] }}
+                  transition={{ duration: 1.2, repeat: Infinity, delay: 0.3 }}
+                />
+                <motion.span
+                  className="typing-dot"
+                  animate={{ opacity: [0.2, 1, 0.2], scale: [0.8, 1.1, 0.8] }}
+                  transition={{ duration: 1.2, repeat: Infinity, delay: 0.6 }}
+                />
+              </div>
+              <span className="text-sm">
+                {fileProcessing ? 'Processing files...' : 
+                 isProMode ? 'Processing deeply...' : 'Thinking...'}
+              </span>
+              <button
+                onClick={stopGeneration}
+                className="ml-2 text-xs bg-red-500 hover:bg-red-600 text-white px-2 py-0.5 rounded-full transition-colors flex items-center"
+              >
+                <FiStopCircle size={12} className="mr-1" />
+                Stop
+              </button>
+            </div>
+
+            {/* Processing sources for Pro Mode */}
+            {isProMode && processingSources.length > 0 && (
+              <div className="mt-2 pt-2 border-t border-gray-200">
+                <div className="grid grid-cols-2 gap-2">
+                  {processingSources.map((source) => (
+                    <div key={source.id} className="flex items-center space-x-2">
+                      <span className={`text-xs ${source.completed ? 'text-green-500' : 'text-blue-500'}`}>
+                        {source.icon}
+                      </span>
+                      <span className="text-xs">
+                        {source.text}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </motion.div>
+      )}
+
       {/* Bottom Input Container */}
       <div className={`${themeClasses.border} ${themeClasses.bgSecondary} pt-2 pb-3 px-4`}>
-        
         {/* File Preview */}
-        <AnimatePresence>
-          {pendingFiles.length > 0 && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.3, ease: 'easeInOut' }}
-              className={`flex items-center space-x-2 p-2 ${themeClasses.border} overflow-x-auto scrollbar-thin ${themeClasses.bgTertiary} rounded-t-lg`}
-            >
-              {pendingFiles.map((file, index) => (
-                <motion.div
-                  key={index}
-                  initial={{ scale: 0.8, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  transition={{ delay: index * 0.05, type: "spring", stiffness: 300 }}
-                  className="relative flex-shrink-0"
+        {pendingFiles.length > 0 && (
+          <div className={`flex items-center space-x-2 p-2 ${themeClasses.border} overflow-x-auto scrollbar-thin ${themeClasses.bgTertiary} rounded-t-lg`}>
+            {pendingFiles.map((file, index) => (
+              <div key={index} className="relative flex-shrink-0">
+                <div className={`w-14 h-14 flex items-center justify-center ${themeClasses.cardBg} rounded-lg ${themeClasses.border} overflow-hidden shadow-sm`}>
+                  {file.type.startsWith('image/') ? (
+                    <img 
+                      src={URL.createObjectURL(file)} 
+                      alt="Preview" 
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="p-1 text-center">
+                      <FiFile size={16} className="mx-auto" />
+                      <p className="text-xs mt-0.5 truncate w-12">{file.name.split('.')[0]}</p>
+                    </div>
+                  )}
+                </div>
+                <button
+                  onClick={() => {
+                    const newFiles = [...pendingFiles];
+                    newFiles.splice(index, 1);
+                    setPendingFiles(newFiles);
+                  }}
+                  className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 hover:bg-red-600 transition-colors shadow"
                 >
-                  <div className={`w-14 h-14 flex items-center justify-center ${themeClasses.cardBg} rounded-lg ${themeClasses.border} overflow-hidden shadow-md`}>
-                    {file.type.startsWith('image/') ? (
-                      <img
-                        src={URL.createObjectURL(file)}
-                        alt="Preview"
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className="p-1 text-center">
-                        <FiFile size={16} className="mx-auto" />
-                        <p className="text-xs mt-0.5 truncate w-12">{file.name.split('.')[0]}</p>
-                      </div>
-                    )}
-                  </div>
-                  <motion.button
-                    onClick={() => {
-                      const newFiles = [...pendingFiles];
-                      newFiles.splice(index, 1);
-                      setPendingFiles(newFiles);
-                    }}
-                    className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5 hover:bg-red-600 transition-all shadow"
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.9 }}
-                  >
-                    <FiX size={10} />
-                  </motion.button>
-                </motion.div>
-              ))}
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Search Mode Indicator */}
-        {searchMode && (
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3 }}
-            className={`text-xs px-3 py-1 mb-1 rounded-full inline-flex items-center ${searchMode === 'deep' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'}`}
-          >
-            <FiGlobe size={12} className="mr-1" />
-            {searchMode === 'deep' ? 'Deep Web Search' : 'Web Search'} enabled
-            <button 
-              onClick={() => setSearchMode(false)}
-              className="ml-2 text-current hover:text-red-500"
-            >
-              <FiX size={12} />
-            </button>
-          </motion.div>
+                  <FiX size={10} />
+                </button>
+              </div>
+            ))}
+          </div>
         )}
-
+        
         {/* Main Input Area */}
-        <div className="relative mt-1">
-          <motion.textarea
+        <div className="relative">
+          <textarea
             ref={textareaRef}
             value={inputMessage}
             onChange={(e) => {
@@ -1515,77 +1013,54 @@ and extremely friendly and very human little bit emoticon and get straight to th
               }
             }}
             placeholder="Type your message..."
-            className={`w-full ${themeClasses.inputBg} ${themeClasses.inputBorder} rounded-xl px-4 py-3 pr-12 focus:outline-none focus:border-transparent resize-none overflow-hidden transition-all duration-300 text-sm ${themeClasses.inputText}`}
+            className={`w-full ${themeClasses.inputBg} ${themeClasses.inputBorder} rounded-xl px-4 py-3 pr-12 focus:outline-none focus:border-transparent resize-none overflow-hidden transition-all duration-200 text-sm ${themeClasses.inputText}`}
             rows={1}
             style={{ minHeight: '48px', maxHeight: '120px' }}
-            whileFocus={{ boxShadow: '0 0 0 3px rgba(59,130,246,0.3)' }}
-            transition={{ type: "spring", stiffness: 100 }}
           />
-
+          
           <div className="absolute right-2 bottom-2 flex items-center space-x-1">
             {inputMessage && (
-              <motion.button
+              <button
                 onClick={() => setInputMessage('')}
-                className={`p-1.5 rounded-full ${themeClasses.hoverBg} transition-all`}
-                whileHover={{ scale: 1.2 }}
-                whileTap={{ scale: 0.9 }}
+                className={`p-1.5 rounded-full ${themeClasses.hoverBg} transition-colors`}
               >
                 <FiX size={16} />
-              </motion.button>
+              </button>
             )}
-
-            <motion.button
-              onClick={toggleSearchMode}
-              className={`p-1.5 rounded-full transition-all ${
-                searchMode === 'deep' ? 'bg-purple-500 text-white' : 
-                searchMode === 'shallow' ? 'bg-blue-500 text-white' : 
-                themeClasses.hoverBg
-              }`}
-              title={searchMode ? `Search mode: ${searchMode}` : 'Enable web search'}
-              whileHover={{ scale: 1.2 }}
-              whileTap={{ scale: 0.9 }}
-            >
-              <FiGlobe size={16} />
-            </motion.button>
-
+            
             {isBotTyping ? (
               <motion.button
                 onClick={stopGeneration}
-                className="p-1.5 rounded-full bg-red-500 hover:bg-red-600 text-white transition-all shadow"
+                className="p-1.5 rounded-full bg-red-500 hover:bg-red-600 text-white transition-colors shadow"
                 title="Stop generation"
-                whileHover={{ scale: 1.2 }}
-                whileTap={{ scale: 0.9 }}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
               >
                 <FiStopCircle size={16} />
               </motion.button>
             ) : (
               <>
-                <motion.button
+                <button
                   onClick={() => setShowFileOptions(!showFileOptions)}
-                  className={`p-1.5 rounded-full transition-all ${showFileOptions ? `${themeClasses.bgTertiary}` : themeClasses.hoverBg}`}
+                  className={`p-1.5 rounded-full transition-colors ${showFileOptions ? `${themeClasses.bgTertiary}` : themeClasses.hoverBg}`}
                   title="Attach files"
-                  whileHover={{ scale: 1.2 }}
-                  whileTap={{ scale: 0.9 }}
                 >
                   <FiPlus size={16} />
-                </motion.button>
-
+                </button>
                 <motion.button
                   onClick={() => handleSendMessage(inputMessage, pendingFiles)}
                   disabled={(!inputMessage.trim() && pendingFiles.length === 0) || isBotTyping}
-                  className={`p-2 rounded-full transition-all duration-300 ${
-                    inputMessage.trim() || pendingFiles.length > 0
-                      ? 'bg-gradient-to-br from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white shadow-md'
-                      : 'text-gray-400 hover:text-gray-500 hover:bg-gray-100'
-                  }`}
-                  whileHover={{
-                    scale: (inputMessage.trim() || pendingFiles.length > 0) ? 1.15 : 1,
-                    rotate: (inputMessage.trim() || pendingFiles.length > 0) ? 6 : 0
+                  className={`p-1.5 rounded-full transition-all ${inputMessage.trim() || pendingFiles.length > 0 ? 
+                    'bg-gradient-to-br from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white shadow' : 
+                    'text-gray-400 hover:text-gray-500 hover:bg-gray-100'}`}
+                  whileHover={{ 
+                    scale: inputMessage.trim() || pendingFiles.length > 0 ? 1.05 : 1,
+                    rotate: inputMessage.trim() || pendingFiles.length > 0 ? 5 : 0
                   }}
-                  whileTap={{ scale: 0.9 }}
+                  whileTap={{ scale: 0.95 }}
                   title="Send message"
                 >
-                  <RiSendPlaneFill size={18} />
+                  <FiSend size={16} />
                 </motion.button>
               </>
             )}
@@ -1593,98 +1068,58 @@ and extremely friendly and very human little bit emoticon and get straight to th
         </div>
 
         {/* File Options */}
-        <AnimatePresence>
-          {showFileOptions && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              transition={{ duration: 0.25 }}
-              className="flex space-x-2 pt-2"
+        {showFileOptions && (
+          <motion.div 
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.2 }}
+            className="flex space-x-2 pt-2"
+          >
+            <motion.label 
+              className={`cursor-pointer p-2 rounded-lg transition-colors ${themeClasses.hoverBg}`}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              title="Upload image"
             >
-              <motion.label
-                className={`cursor-pointer p-2 rounded-lg transition-all ${themeClasses.hoverBg}`}
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.95 }}
-                title="Upload image"
-              >
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={handleFileUpload}
-                  multiple
-                />
-                <FiImage size={18} />
-              </motion.label>
-              <motion.label
-                className={`cursor-pointer p-2 rounded-lg transition-all ${themeClasses.hoverBg}`}
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.95 }}
-                title="Upload file"
-              >
-                <input
-                  type="file"
-                  accept=".pdf,.txt,.doc,.docx,.csv"
-                  className="hidden"
-                  onChange={handleFileUpload}
-                  multiple
-                />
-                <FiFile size={18} />
-              </motion.label>
-            </motion.div>
-          )}
-        </AnimatePresence>
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleFileUpload}
+                multiple
+              />
+              <FiImage size={18} />
+            </motion.label>
+            <motion.label 
+              className={`cursor-pointer p-2 rounded-lg transition-colors ${themeClasses.hoverBg}`}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              title="Upload file"
+            >
+              <input
+                type="file"
+                className="hidden"
+                onChange={handleFileUpload}
+                multiple
+              />
+              <FiFile size={18} />
+            </motion.label>
+          </motion.div>
+        )}
       </div>
-
-      {/* Prism.js for syntax highlighting */}
-      <link 
-        id="prism-theme"
-        href={darkMode 
-          ? "https://cdnjs.cloudflare.com/ajax/libs/prism/1.24.1/themes/prism-tomorrow.min.css" 
-          : "https://cdnjs.cloudflare.com/ajax/libs/prism/1.24.1/themes/prism-coy.min.css"
-        } 
-        rel="stylesheet" 
-      />
-      <link 
-        href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.24.1/plugins/line-numbers/prism-line-numbers.min.css" 
-        rel="stylesheet" 
-      />
-      <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.24.1/components/prism-core.min.js"></script>
-      <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.24.1/plugins/autoloader/prism-autoloader.min.js"></script>
-      <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.24.1/plugins/line-numbers/prism-line-numbers.min.js"></script>
       
       <style jsx global>{`
-        /* Typing Dot */
+        /* Modern Typing Animation */
         .typing-dot {
           display: inline-block;
           width: 8px;
           height: 8px;
           border-radius: 50%;
           background-color: currentColor;
-          margin-right: 2px;
-          animation: typingAnimation 1.4s infinite ease-in-out;
         }
 
-        .typing-dot:nth-child(1) {
-          animation-delay: 0s;
-        }
-
-        .typing-dot:nth-child(2) {
-          animation-delay: 0.2s;
-        }
-
-        .typing-dot:nth-child(3) {
-          animation-delay: 0.4s;
-          margin-right: 0;
-        }
-
-        @keyframes typingAnimation {
-          0%, 60%, 100% { transform: translateY(0); }
-          30% { transform: translateY(-3px); }
-        }
-
-        /* Code Container */
+        /* Enhanced Code Container */
         .code-container {
           background: ${darkMode ? '#1e293b' : '#f8fafc'};
           border-radius: 12px;
@@ -1699,6 +1134,7 @@ and extremely friendly and very human little bit emoticon and get straight to th
           transform: translateY(-2px);
         }
 
+        /* Sleek Code Toolbar */
         .code-toolbar {
           display: flex;
           justify-content: space-between;
@@ -1710,6 +1146,7 @@ and extremely friendly and very human little bit emoticon and get straight to th
           border-bottom: 1px solid ${darkMode ? '#334155' : '#e2e8f0'};
         }
 
+        /* Modern Language Tag */
         .language-tag {
           background: ${darkMode ? '#334155' : '#e2e8f0'};
           padding: 0.3em 0.8em;
@@ -1720,6 +1157,7 @@ and extremely friendly and very human little bit emoticon and get straight to th
           transition: all 0.2s ease;
         }
 
+        /* Improved Copy Button */
         .copy-button {
           background: transparent;
           border: 1px solid ${darkMode ? '#475569' : '#cbd5e1'};
@@ -1733,45 +1171,42 @@ and extremely friendly and very human little bit emoticon and get straight to th
           gap: 0.4em;
           transition: all 0.2s ease;
         }
-
         .copy-button:hover {
           background: ${darkMode ? '#334155' : '#e2e8f0'};
           border-color: ${darkMode ? '#64748b' : '#94a3b8'};
           transform: translateY(-1px);
         }
-
         .copy-button:active {
           transform: translateY(0);
         }
 
+        /* Refined Code Block */
         .code-block {
           margin: 0;
           padding: 1em;
-          color: ${darkMode ? '#f1f5f9' : '#1e293b'};
+          color: black;
           overflow-x: auto;
           font-family: 'Fira Code', 'JetBrains Mono', 'Courier New', monospace;
           font-size: 0.9em;
           line-height: 1.6;
+          color: ${darkMode ? '#f1f5f9' : '#1e293b'};
           background: ${darkMode ? '#1e293b' : '#f8fafc'};
           scrollbar-width: thin;
           scrollbar-color: ${darkMode ? '#475569' : '#cbd5e1'} transparent;
         }
-
         .code-block::-webkit-scrollbar {
           height: 6px;
         }
-
         .code-block::-webkit-scrollbar-thumb {
           background: ${darkMode ? '#475569' : '#cbd5e1'};
           border-radius: 3px;
         }
-
         .code-block code {
           font-family: inherit;
           font-variant-ligatures: contextual;
         }
 
-        /* Notification */
+        /* Smoother Notification */
         .copy-notification {
           position: fixed;
           bottom: 24px;
@@ -1787,73 +1222,29 @@ and extremely friendly and very human little bit emoticon and get straight to th
           box-shadow: 0 8px 24px rgba(0,0,0,0.15);
           font-weight: 500;
         }
-
         @keyframes slideUp {
           from { opacity: 0; transform: translateX(-50%) translateY(10px); }
           to { opacity: 1; transform: translateX(-50%) translateY(0); }
         }
-
         @keyframes fadeOut {
           to { opacity: 0; }
         }
 
-        /* Chat bubbles */
-        .chat-bubble {
-          padding: 12px 16px;
-          margin-bottom: 16px;
-          border-radius: 16px;
-          max-width: 85%;
-          word-wrap: break-word;
-          animation: fadeInUp 0.3s ease;
-          box-shadow: 0 4px 10px rgba(0,0,0,0.05);
-          transition: transform 0.3s ease, background-color 0.2s ease;
-        }
-
-        .chat-bubble.user {
-          align-self: flex-end;
-          background-color: ${darkMode ? '#3b82f6' : '#dbeafe'};
-          color: ${darkMode ? '#f8fafc' : '#1e3a8a'};
-          margin-left: auto;
-          margin-right: 8px;
-        }
-
-        .chat-bubble.bot {
-          align-self: flex-start;
-          background-color: ${darkMode ? '#1e293b' : '#f1f5f9'};
-          color: ${darkMode ? '#e2e8f0' : '#334155'};
-          margin-right: auto;
-          margin-left: 8px;
-        }
-
-        @keyframes fadeInUp {
-          0% {
-            opacity: 0;
-            transform: translateY(10px);
-          }
-          100% {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-
-        /* Prose styling for messages */
+        /* Enhanced Prose Styles */
         .prose {
           max-width: 100%;
           font-size: 0.95rem;
           line-height: 1.7;
           color: ${darkMode ? '#e2e8f0' : '#334155'};
         }
-
         .prose ul {
           list-style-type: disc;
           padding-left: 1.5em;
           margin: 0.5em 0;
         }
-
         .prose li {
           margin: 0.25em 0;
         }
-
         .prose code:not(.code-block code) {
           background: ${darkMode ? 'rgba(148,163,184,0.2)' : 'rgba(148,163,184,0.15)'};
           padding: 0.2em 0.4em;
@@ -1861,39 +1252,32 @@ and extremely friendly and very human little bit emoticon and get straight to th
           font-size: 0.85em;
           transition: background 0.2s ease;
         }
-
         .prose code:not(.code-block code):hover {
           background: ${darkMode ? 'rgba(148,163,184,0.3)' : 'rgba(148,163,184,0.25)'};
         }
-
         .prose strong {
           font-weight: 600;
           color: ${darkMode ? '#f8fafc' : '#1e293b'};
         }
-
         .prose a {
           color: #3b82f6;
           text-decoration: none;
           transition: all 0.2s ease;
           border-bottom: 1px solid transparent;
         }
-
         .prose a:hover {
           color: #2563eb;
           border-bottom-color: currentColor;
         }
-
         .prose img {
           max-width: 100%;
           height: auto;
           border-radius: 8px;
           transition: transform 0.3s ease;
         }
-
         .prose img:hover {
           transform: scale(1.02);
         }
-
         .prose blockquote {
           border-left: 3px solid ${darkMode ? '#334155' : '#e2e8f0'};
           padding-left: 1.25em;
@@ -1902,18 +1286,15 @@ and extremely friendly and very human little bit emoticon and get straight to th
           font-style: italic;
           transition: border-color 0.3s ease;
         }
-
         .prose blockquote:hover {
           border-left-color: ${darkMode ? '#64748b' : '#94a3b8'};
         }
-
         .prose hr {
           border: none;
           border-top: 1px solid ${darkMode ? '#334155' : '#e2e8f0'};
           margin: 1.5em 0;
           position: relative;
         }
-
         .prose hr::after {
           content: "";
           position: absolute;
@@ -1929,4 +1310,4 @@ and extremely friendly and very human little bit emoticon and get straight to th
   );
 };
 
-export default ChatBot; 
+export default ChatBot;
