@@ -176,13 +176,10 @@ const ChatBot = () => {
   const controls = useAnimation();
 
 
-// Inisialisasi Gemini AI
-const genAI = new GoogleGenerativeAI("AIzaSyDSTgkkROL7mjaGKoD2vnc8l2UptNCbvHk");
 
-// Gunakan model Gemini 2.0 Flash
-const model = genAI.getGenerativeModel({
-  model: "models/gemini-1.5-flash"
-});
+// Initialize Google's Gemini AI
+const genAI = new GoogleGenerativeAI("AIzaSyDSTgkkROL7mjaGKoD2vnc8l2UptNCbvHk");
+const model = genAI.getGenerativeModel({ model: "gemini-2.0" });
 
   // Enhanced memory system
   const loadMemories = useCallback(() => {
@@ -212,7 +209,7 @@ const model = genAI.getGenerativeModel({
     }
   }, []);
 
-  // Load all data from localStorage
+  //oad all data from localStorage
   useEffect(() => {
     loadMemories();
     
