@@ -8,6 +8,7 @@ import {
   FiUser, FiCode, FiHelpCircle, FiLightbulb
 } from 'react-icons/fi';
 
+
 const ChatBot = () => {
   const [chatRooms, setChatRooms] = useState([]);
   const [currentRoomId, setCurrentRoomId] = useState(null);
