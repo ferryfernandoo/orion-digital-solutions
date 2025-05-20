@@ -175,9 +175,14 @@ const ChatBot = () => {
   const messageCountRef = useRef(0);
   const controls = useAnimation();
 
-  // Initialize ORION Generative AI
-  const genAI = new GoogleGenerativeAI("AIzaSyDSTgkkROL7mjaGKoD2vnc8l2UptNCbvHk");
-  const model = genAI.getGenerativeModel({ model: "models/gemini-2.0-flash" });
+
+// Inisialisasi Gemini AI
+const genAI = new GoogleGenerativeAI("AIzaSyDSTgkkROL7mjaGKoD2vnc8l2UptNCbvHk");
+
+// Gunakan model Gemini 2.0 Flash
+const model = genAI.getGenerativeModel({
+  model: "models/gemini-2.0-flash"
+});
 
   // Enhanced memory system
   const loadMemories = useCallback(() => {
