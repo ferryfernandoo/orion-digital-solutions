@@ -181,7 +181,7 @@ const genAI = new GoogleGenerativeAI("AIzaSyDSTgkkROL7mjaGKoD2vnc8l2UptNCbvHk");
 
 // Gunakan model Gemini 2.0 Flash
 const model = genAI.getGenerativeModel({
-  model: "models/gemini-2.0-flash"
+  model: "models/gemini-1.5-flash"
 });
 
   // Enhanced memory system
