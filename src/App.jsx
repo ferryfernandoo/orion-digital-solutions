@@ -7,6 +7,7 @@ import Services from "./pages/Services";
 import Contact from "./pages/Contact";
 import ChatBot from "./pages/Chatbot";
 import Form from "./pages/Form";
+import Products from "./pages/Products";
 
 function App() {
   const location = useLocation(); // Ambil lokasi saat ini
@@ -23,6 +24,7 @@ function App() {
           <Route path="/contact" element={<Contact />} />
           <Route path="/chatbot" element={<ChatBot />} />
           <Route path="/form" element={<Form />} />
+          <Route path="/products" element={<Products />} />
         </Routes>
       </main>
       {/* Tampilkan footer hanya jika bukan di halaman ChatBot */}
