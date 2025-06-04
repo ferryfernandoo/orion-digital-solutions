@@ -65,6 +65,7 @@ const performWebSearch = async (query) => {
         snippet: topic.Text.replace(/<[^>]*>?/gm, ''),
         source: 'DuckDuckGo'
       }));
+      
     
     // If no results, try Wikipedia API
     if (results.length < 3) {
@@ -169,7 +170,32 @@ const ChatBot = () => {
       }
     }
   }, []);
+ // Enter fullscreen mode when component mounts
+  useEffect(() => {
+    const enterFullscreen = () => {
+      try {
+        if (!document.fullscreenElement) {
+          document.documentElement.requestFullscreen().catch(err => {
+            console.log(`Error attempting to enable fullscreen: ${err.message}`);
+          });
+        }
+      } catch (error) {
+        console.error("Fullscreen error:", error);
+      }
+    };
 
+    // Add animation class to body for smooth transitions
+    document.body.classList.add('smooth-transitions');
+    
+    // Enter fullscreen with a slight delay to allow DOM to load
+    const fullscreenTimer = setTimeout(enterFullscreen, 300);
+    
+    // Cleanup
+    return () => {
+      clearTimeout(fullscreenTimer);
+      document.body.classList.remove('smooth-transitions');
+    };
+  }, []);
   // Load all data from localStorage
   useEffect(() => {
     loadMemories();
