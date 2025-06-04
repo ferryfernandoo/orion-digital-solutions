@@ -1,0 +1,60 @@
+/* Basic fullscreen styles */
+.fullscreen-app {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background: #1a1b1e;
+}
+
+/* Desktop OS container */
+.desktop-os {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background: #1a1b1e;
+}
+
+/* Desktop icons layout */
+.desktop-icons {
+  padding: 16px;
+  max-width: 100%;
+}
+
+.desktop-icon {
+  transition: all 0.2s ease;
+  width: 80px;
+  min-height: 80px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+}
+
+.desktop-icon:hover {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(8px);
+}
+
+/* Window styling */
+.window-title-bar {
+  cursor: move;
+  user-select: none;
+  transition: opacity 0.3s ease;
+}
+
+/* Taskbar styling */
+.taskbar {
+  backdrop-filter: blur(10px);
+}
