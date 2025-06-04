@@ -1,0 +1,254 @@
+.window {
+  position: absolute;
+  background: #1a1b1e;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transform-origin: center center;
+}
+
+.window.maximized {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: 0;
+  animation: maximize 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.window.minimizing {
+  animation: minimize 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transform: translate(0, 100vh) scale(0.6);
+  opacity: 0;
+}
+
+.window.closing {
+  animation: close 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  transform: scale(0.9);
+  opacity: 0;
+}
+
+.window-title-bar {
+  display: flex;
+  align-items: center;
+  background: rgba(28, 28, 30, 0.9);
+  backdrop-filter: blur(10px);
+  height: 32px;
+  padding: 0 2px;
+  user-select: none;
+}
+
+.window-controls {
+  display: flex;
+  align-items: center;
+  margin-left: auto;
+}
+
+.window-control-button {
+  width: 46px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #fff;
+  opacity: 0.8;
+  transition: all 0.2s ease;
+}
+
+.window-control-button:hover {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.window-control-button.close-button:hover {
+  background: #e81123;
+}
+
+.window-control-button .control-icon {
+  width: 16px;
+  height: 16px;
+  transition: transform 0.2s ease;
+}
+
+.window-control-button:hover .control-icon {
+  transform: scale(1.1);
+}
+
+.window.dragging {
+  transition: none;
+  cursor: move;
+  opacity: 0.92;
+  transform: scale(1.02);
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.4);
+}
+
+@keyframes maximize {
+  0% {
+    transform: scale(0.95);
+  }
+  50% {
+    transform: scale(1.02);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes minimize {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(0, 100vh) scale(0.6);
+    opacity: 0;
+  }
+}
+
+@keyframes close {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(0.9);
+    opacity: 0;
+  }
+}
+
+/* Orion OS Styles */
+.taskbar {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+  opacity: 0.95;
+}
+
+.taskbar:hover {
+  opacity: 1;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
+}
+
+.taskbar button {
+  outline: none !important;
+}
+
+.taskbar button:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.taskbar button:active {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.window-active-indicator {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 16px;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.5);  border-radius: 1px;
+}
+
+.active-task-indicator {
+  box-shadow: 0 0 40px theme('colors.purple.500');
+}
+
+@keyframes orionPulse {
+  0% {
+    box-shadow: 0 0 20px rgba(59, 130, 246, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 30px rgba(59, 130, 246, 0.4);
+  }
+  100% {
+    box-shadow: 0 0 20px rgba(59, 130, 246, 0.2);
+  }
+}
+
+.orion-text-glow {
+  text-shadow: 0 0 10px theme('colors.blue.500');
+  animation: textPulse 2s infinite;
+}
+
+@keyframes textPulse {
+  0% {
+    text-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
+  }
+  50% {
+    text-shadow: 0 0 20px rgba(59, 130, 246, 0.8);
+  }
+  100% {
+    text-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
+  }
+}
+
+/* Task View animations */
+.task-view-enter {
+  opacity: 0;
+  transform: scale(0.9);
+}
+
+.task-view-enter-active {
+  opacity: 1;
+  transform: scale(1);
+  transition: opacity 0.3s, transform 0.3s;
+}
+
+.task-view-exit {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.task-view-exit-active {
+  opacity: 0;
+  transform: scale(0.9);
+  transition: opacity 0.3s, transform 0.3s;
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* Quick Settings Panel */
+.quick-settings-panel {
+  backdrop-filter: blur(20px);
+  animation: slideUp 0.2s ease-out;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* Start Menu animations */
+.start-menu {
+  animation: fadeScale 0.2s ease-out;
+}
+
+@keyframes fadeScale {
+  from {
+    transform: scale(0.95) translateY(10px);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+}
