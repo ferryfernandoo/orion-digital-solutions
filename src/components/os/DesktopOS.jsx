@@ -7,23 +7,15 @@ import Mail from '../apps/Mail';
 import Calendar from '../apps/Calendar';
 import FileExplorer from '../apps/FileExplorer';
 import PhotoViewer from '../apps/PhotoViewer';
+import CodeEditor from '../apps/CodeEditor';  
 import WindowTitleBar from './WindowTitleBar';
+
 import '../../styles/windows.css';
 
-const DesktopOS = () => {
-  const [activeWindows, setActiveWindows] = useState([]);
-  const [focusedWindow, setFocusedWindow] = useState(null);
-  const [isStartMenuOpen, setIsStartMenuOpen] = useState(false);
-  const [currentTime, setCurrentTime] = useState(new Date().toLocaleTimeString());
-  const [windowPositions, setWindowPositions] = useState({});
-  const [windowSizes, setWindowSizes] = useState({});
-  const [minimizedWindows, setMinimizedWindows] = useState([]);
-  const [maximizedWindows, setMaximizedWindows] = useState([]);
-  const [previousWindowStates, setPreviousWindowStates] = useState({});
-  const [dragStartPosition, setDragStartPosition] = useState(null);
-  const [windowStartPosition, setWindowStartPosition] = useState(null);
-  const [selectedImage, setSelectedImage] = useState(null);
 
+const DesktopOS = () => {
+
+  const [selectedImage, setSelectedImage] = useState(null);
   const handleOpenImage = (file) => {
     setSelectedImage(file);
     const photoViewerApp = apps.find(a => a.name === 'Photo Viewer');
@@ -31,7 +23,6 @@ const DesktopOS = () => {
       openWindow(photoViewerApp.id);
     }
   };
-
   const apps = [
     { 
       id: 1, 
@@ -83,49 +74,31 @@ const DesktopOS = () => {
         </div>
       )
     },
-    { 
-      id: 4, 
-      name: 'Calculator', 
-      icon: '🧮',
-      content: <Calculator />,
-      defaultSize: { width: 400, height: 600 }
-    },
-    { 
-      id: 5, 
-      name: 'Terminal', 
-      icon: '⌨️',
-      content: <Terminal />,
-      defaultSize: { width: 800, height: 500 }
-    },
-    { 
-      id: 6, 
-      name: 'Notes', 
-      icon: '📝',
-      content: <Notes />,
-      defaultSize: { width: 800, height: 600 }
-    },
-    { 
-      id: 7, 
-      name: 'Mail', 
-      icon: '✉️',
-      content: <Mail />,
-      defaultSize: { width: 1000, height: 600 }
-    },    
-    { 
-      id: 8, 
-      name: 'Calendar', 
-      icon: '📅',
-      content: <Calendar />,
-      defaultSize: { width: 900, height: 600 }
-    },
-    {
-      id: 9,
-      name: 'Photo Viewer',
-      icon: '🖼️',
-      content: <PhotoViewer file={selectedImage} />,
-      defaultSize: { width: 800, height: 600 }
-    }
+    { id: 4, name: 'Calculator', icon: '🧮', content: <Calculator />, defaultSize: { width: 400, height: 600 } },
+    { id: 5, name: 'Terminal', icon: '⌨️', content: <Terminal />, defaultSize: { width: 800, height: 500 } },
+    { id: 6, name: 'Notes', icon: '📝', content: <Notes />, defaultSize: { width: 800, height: 600 } },
+    { id: 7, name: 'Mail', icon: '✉️', content: <Mail />, defaultSize: { width: 1000, height: 600 } },
+    { id: 8, name: 'Calendar', icon: '📅', content: <Calendar />, defaultSize: { width: 900, height: 600 } },
+    { id: 9, name: 'Photo Viewer', icon: '🖼️', content: <PhotoViewer file={selectedImage} />, defaultSize: { width: 800, height: 600 } },
+    { id: 10, name: 'Code Editor', icon: '💻', content: <CodeEditor />, defaultSize: { width: 800, height: 600 } }
   ];
+
+  const [searchQuery, setSearchQuery] = useState("");
+  const filteredApps = apps.filter(app =>
+    app.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const [activeWindows, setActiveWindows] = useState([]);
+  const [focusedWindow, setFocusedWindow] = useState(null);
+  const [isStartMenuOpen, setIsStartMenuOpen] = useState(false);
+  const [currentTime, setCurrentTime] = useState(new Date().toLocaleTimeString());
+  const [windowPositions, setWindowPositions] = useState({});
+  const [windowSizes, setWindowSizes] = useState({});
+  const [minimizedWindows, setMinimizedWindows] = useState([]);
+  const [maximizedWindows, setMaximizedWindows] = useState([]);
+  const [previousWindowStates, setPreviousWindowStates] = useState({});
+  const [dragStartPosition, setDragStartPosition] = useState(null);
+  const [windowStartPosition, setWindowStartPosition] = useState(null);
 
   // Effect untuk memastikan fullscreen dan menyembunyikan taskbar Windows
   useEffect(() => {
@@ -440,79 +413,134 @@ const DesktopOS = () => {
           })}
         </AnimatePresence>
 
-        {/* Taskbar - More Windows-like */}
-        <div className="taskbar fixed bottom-0 left-0 right-0 h-12 bg-[#1a1b1e]/95 backdrop-blur-md border-t border-white/10 flex items-center px-2 z-50">
-          {/* Start Button */}
-          <motion.button
-            className="flex items-center gap-2 px-3 py-1.5 rounded-md hover:bg-white/10 h-10"
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={() => setIsStartMenuOpen(!isStartMenuOpen)}
-          >
-            <span className="text-2xl">🚀</span>
-          </motion.button>
+       {/* Taskbar - More Windows-like */}
+<div className="taskbar fixed bottom-0 left-0 right-0 h-12 bg-[#1a1b1e]/95 backdrop-blur-md border-t border-white/10 flex items-center px-2 z-50">
+  
+  {/* Start Button */}
+ <motion.button
+  className="flex items-center gap-2 px-3 py-1.5 rounded-md hover:bg-white/10 h-10"
+  
+  onClick={() => setIsStartMenuOpen(!isStartMenuOpen)}
+>
+  <span className="text-2xl">
+    {/* Orion Pulse Core */}
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <circle cx="12" cy="12" r="9" strokeOpacity="0.3"/>
+      <circle cx="12" cy="12" r="6.5" strokeOpacity="0.5"/>
+      <circle cx="12" cy="12" r="2.5" fill="white" />
+      <circle cx="17" cy="12" r="0.7" fill="white" />
+      <circle cx="7" cy="12" r="0.7" fill="white" />
+    </svg>
+  </span>
+  {/* Search Bar in Taskbar */}
+<div className="ml-3 w-64">
+  <input
+    type="text"
+    placeholder="Search..."
+    className="w-full px-3 py-1 rounded-md bg-white/10 text-white focus:outline-none focus:ring-2 focus:ring-white/30 placeholder-white/50"
+    value={searchQuery}
+    onChange={(e) => setSearchQuery(e.target.value)}
+  />
+</div>
 
-          {/* Active Apps */}
-          <div className="flex-1 flex items-center gap-1 px-2">
-            {activeWindows.map(appId => {
-              const app = apps.find(a => a.id === appId);
-              const isFocused = focusedWindow === appId;
-              const isMinimized = minimizedWindows.includes(appId);
+</motion.button>
 
-              return (
-                <motion.button
-                  key={appId}
-                  className={`flex items-center gap-2 px-3 h-10 rounded-md ${
-                    isFocused ? 'bg-white/20' : isMinimized ? 'opacity-50 hover:opacity-100 hover:bg-white/10' : 'hover:bg-white/10'
-                  }`}
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => openWindow(appId)}
-                >
-                  <span>{app.icon}</span>
-                  <span className="text-white/90 text-sm">{app.name}</span>
-                </motion.button>
-              );
-            })}
-          </div>
 
-          {/* System Tray */}
-          <div className="flex items-center gap-4 px-4">
-            <span className="text-white/90 text-sm">{currentTime}</span>
-          </div>
-        </div>
 
-        {/* Start Menu - More Windows 11 style */}
-        <AnimatePresence>
-          {isStartMenuOpen && (
-            <motion.div
-              className="fixed bottom-12 left-4 w-[400px] bg-[#1a1b1e]/95 backdrop-blur-md rounded-lg shadow-lg z-50 border border-white/10 pb-4"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 20 }}
-            >
-              <div className="p-4">
-                <div className="grid grid-cols-3 gap-4">
-                  {apps.map(app => (
-                    <motion.button
-                      key={app.id}
-                      className="flex flex-col items-center gap-2 p-3 rounded-lg hover:bg-white/10"
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                      onClick={() => openWindow(app.id)}
-                    >
-                      <span className="text-2xl">{app.icon}</span>
-                      <span className="text-white/90 text-sm text-center">{app.name}</span>
-                    </motion.button>
-                  ))}
-                </div>
-              </div>
-            </motion.div>
+  {/* Active Apps */}
+  <div className="flex-1 flex items-center gap-1 px-2">
+    {activeWindows.map(appId => {
+      const app = apps.find(a => a.id === appId);
+      const isFocused = focusedWindow === appId;
+      const isMinimized = minimizedWindows.includes(appId);
+
+      return (
+        <motion.button
+          key={appId}
+          className={`flex items-center gap-2 px-3 h-10 rounded-md ${
+            isFocused ? 'bg-white/20' : isMinimized ? 'opacity-50 hover:opacity-100 hover:bg-white/10' : 'hover:bg-white/10'
+          }`}
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={() => openWindow(appId)}
+        >
+          <span>{app.icon}</span>
+          <span className="text-white/90 text-sm">{app.name}</span>
+        </motion.button>
+      );
+    })}
+  </div>
+
+  {/* System Tray */}
+  <div className="flex items-center gap-4 px-4">
+    <span className="text-white/90 text-sm">{currentTime}</span>
+  </div>
+</div>
+
+{/* Start Menu */}
+{/* Start Menu */}
+<AnimatePresence>
+  {isStartMenuOpen && (
+    <motion.div
+      className="fixed bottom-12 left-4 w-[420px] bg-gradient-to-br from-[#22252A] to-[#1A1C1F] backdrop-blur-3xl rounded-3xl shadow-2xl border border-white/20 z-50 overflow-hidden"
+      initial={{ opacity: 0, y: 50, scale: 0.85 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: 30, scale: 0.9 }}
+      transition={{
+        type: "spring",
+        stiffness: 140,
+        damping: 20
+      }}
+    >
+      {/* Watermark */}
+      <div className="px-5 pt-5 pb-2 flex justify-between items-center">
+        <span className="text-white/40 text-xs font-semibold select-none">Hypernova OS v1.0</span>
+      </div>
+
+      {/* Search Bar */}
+      <div className="px-5 pb-3">
+        <input
+          type="text"
+          placeholder="Search apps..."
+          className="w-full p-2 rounded-xl bg-white/10 text-white focus:outline-none focus:ring-2 focus:ring-white/30 placeholder-white/50"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+        />
+      </div>
+
+      {/* Apps Grid */}
+      <div className="p-5 pt-0">
+        <div className="grid grid-cols-3 gap-5">
+          {filteredApps.length > 0 ? (
+            filteredApps.map(app => (
+              <motion.button
+                key={app.id}
+                className="flex flex-col items-center gap-2 p-4 rounded-2xl bg-white/5 hover:bg-white/20 transition duration-300 ease-in-out shadow-lg"
+                whileHover={{
+                  scale: 1.15,
+                  boxShadow: "0px 16px 40px rgba(255,255,255,0.15)",
+                  transition: { type: "spring", stiffness: 400, damping: 20 }
+                }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => openWindow(app.id)}
+              >
+                <span className="text-4xl">{app.icon}</span>
+                <span className="text-white/90 text-sm text-center">{app.name}</span>
+              </motion.button>
+            ))
+          ) : (
+            <div className="col-span-3 text-white/50 text-center py-10">No apps found</div>
           )}
-        </AnimatePresence>
+        </div>
+      </div>
+    </motion.div>
+  )}
+</AnimatePresence>
+
+
       </div>
     </div>
   );
-};
+}
 
 export default DesktopOS;
