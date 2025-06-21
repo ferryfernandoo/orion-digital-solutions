@@ -148,6 +148,8 @@ const ChatBot = () => {
   const [copiedMessageId, setCopiedMessageId] = useState(null);
   const [memoryImportanceFilter, setMemoryImportanceFilter] = useState('all'); // 'all', 'important', 'normal'
   const [showMemoryDetails, setShowMemoryDetails] = useState(null);
+    const [showAd, setShowAd] = useState(true);
+  const [adTimer, setAdTimer] = useState(0);
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
   const chatContainerRef = useRef(null);
@@ -157,7 +159,33 @@ const ChatBot = () => {
   // Initialize Google Generative AI
   const genAI = new GoogleGenerativeAI("AIzaSyDSTgkkROL7mjaGKoD2vnc8l2UptNCbvHk");
   const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+ // Load AdSense script
+  useEffect(() => {
+    const script = document.createElement('script');
+    script.async = true;
+    script.src = "https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6822768824603153";
+    script.crossOrigin = "anonymous";
+    document.head.appendChild(script);
 
+    return () => {
+      document.head.removeChild(script);
+    };
+  }, []);
+
+  // Show ad after 10 minutes of usage
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setAdTimer(prev => {
+        if (prev >= 600) { // 10 minutes
+          setShowAd(true);
+          return 0;
+        }
+        return prev + 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, []);
   // Enhanced memory system with Indonesian language support
   const loadMemories = useCallback(() => {
     const savedMemories = localStorage.getItem('orionMemories');
