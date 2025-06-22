@@ -148,7 +148,7 @@ const ChatBot = () => {
   const [copiedMessageId, setCopiedMessageId] = useState(null);
   const [memoryImportanceFilter, setMemoryImportanceFilter] = useState('all'); // 'all', 'important', 'normal'
   const [showMemoryDetails, setShowMemoryDetails] = useState(null);
-    const [showAd, setShowAd] = useState(true);
+  const [showAd, setShowAd] = useState(true);
   const [adTimer, setAdTimer] = useState(0);
   const messagesEndRef = useRef(null);
   const textareaRef = useRef(null);
@@ -159,7 +159,8 @@ const ChatBot = () => {
   // Initialize Google Generative AI
   const genAI = new GoogleGenerativeAI("AIzaSyDSTgkkROL7mjaGKoD2vnc8l2UptNCbvHk");
   const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
- // Load AdSense script
+
+  // Load AdSense script
   useEffect(() => {
     const script = document.createElement('script');
     script.async = true;
@@ -186,6 +187,7 @@ const ChatBot = () => {
 
     return () => clearInterval(timer);
   }, []);
+
   // Enhanced memory system with Indonesian language support
   const loadMemories = useCallback(() => {
     const savedMemories = localStorage.getItem('orionMemories');
@@ -198,7 +200,8 @@ const ChatBot = () => {
       }
     }
   }, []);
- // Enter fullscreen mode when component mounts
+
+  // Enter fullscreen mode when component mounts
   useEffect(() => {
     const enterFullscreen = () => {
       try {
@@ -224,6 +227,7 @@ const ChatBot = () => {
       document.body.classList.remove('smooth-transitions');
     };
   }, []);
+
   // Load all data from localStorage
   useEffect(() => {
     loadMemories();
@@ -1002,21 +1006,50 @@ and extremely friendly and very human little bit emoticon and get straight to th
 
   return (
     <div className={`flex flex-col h-screen ${themeClasses.bgPrimary} ${themeClasses.textPrimary} relative overflow-hidden transition-colors duration-300`}>
+      {/* Ad Banner (Top) */}
+      {showAd && (
+        <motion.div 
+          initial={{ opacity: 0, y: -50 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -50 }}
+          transition={{ duration: 0.3 }}
+          className={`w-full ${themeClasses.bgSecondary} ${themeClasses.border} p-2 flex justify-center items-center sticky top-0 z-50`}
+        >
+          <div className="text-center text-xs">
+            <p className="mb-1">Dukung kami dengan menonaktifkan AdBlock</p>
+            <div className="w-full max-w-2xl mx-auto">
+              <ins className="adsbygoogle"
+                style={{ display: 'block' }}
+                data-ad-client="ca-pub-6822768824603153"
+                data-ad-slot="1234567890"
+                data-ad-format="auto"
+                data-full-width-responsive="true"></ins>
+            </div>
+            <button 
+              onClick={() => setShowAd(false)}
+              className="mt-1 text-xs text-gray-400 hover:text-gray-600"
+            >
+              Tutup iklan
+            </button>
+          </div>
+        </motion.div>
+      )}
+
       {/* Header */}
-      <div className={`${themeClasses.bgSecondary} ${themeClasses.border} p-3 flex items-center justify-between sticky top-0 z-10 shadow-sm`}>
-        <div className="flex items-center space-x-2">
+      <div className={`${themeClasses.bgSecondary} ${themeClasses.border} p-4 flex items-center justify-between sticky top-0 z-10 shadow-sm`}>
+        <div className="flex items-center space-x-3">
           <button 
             onClick={() => setShowChatHistory(!showChatHistory)}
-            className={`p-1.5 rounded-full ${themeClasses.hoverBg} transition-colors`}
+            className={`p-2 rounded-full ${themeClasses.hoverBg} transition-colors`}
             title="Riwayat Percakapan"
           >
-            <FiMessageSquare size={16} className={themeClasses.textSecondary} />
+            <FiMessageSquare size={18} className={themeClasses.textSecondary} />
           </button>
-          <div className="w-7 h-7 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow">
-            <span className="text-white text-xs font-bold">AI</span>
+          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg">
+            <span className="text-white text-sm font-bold">AI</span>
           </div>
           <div>
-            <h2 className="font-semibold text-sm">Orion AI</h2>
+            <h2 className="font-semibold text-base">Orion AI</h2>
             <p className="text-xs flex items-center">
               {isBotTyping ? (
                 <span className="flex items-center">
@@ -1027,46 +1060,46 @@ and extremely friendly and very human little bit emoticon and get straight to th
                 </span>
               ) : (
                 <span className="flex items-center">
-                  <span className="w-1.5 h-1.5 bg-green-500 rounded-full mr-1"></span>
+                  <span className="w-2 h-2 bg-green-500 rounded-full mr-1"></span>
                   Online {isProMode && <span className="ml-1 text-blue-400">(Mode Pro)</span>}
                 </span>
               )}
             </p>
           </div>
         </div>
-        <div className="flex items-center space-x-1">
+        <div className="flex items-center space-x-2">
           <button 
             onClick={toggleDarkMode}
-            className={`p-1.5 rounded-full transition-colors ${themeClasses.hoverBg}`}
+            className={`p-2 rounded-full transition-colors ${themeClasses.hoverBg}`}
             title={darkMode ? 'Ganti ke mode terang' : 'Ganti ke mode gelap'}
           >
-            {darkMode ? <FiSun size={16} className="text-yellow-300" /> : <FiMoon size={16} />}
+            {darkMode ? <FiSun size={18} className="text-yellow-300" /> : <FiMoon size={18} />}
           </button>
           <button 
             onClick={toggleProMode}
-            className={`p-1.5 rounded-full transition-all ${
+            className={`p-2 rounded-full transition-all ${
               isProMode ? 'bg-blue-100 text-blue-600' : themeClasses.hoverBg
             }`}
             title={isProMode ? 'Matikan Mode Pro' : 'Aktifkan Mode Pro'}
           >
-            <FiZap size={16} className={isProMode ? "text-yellow-500" : ""} />
+            <FiZap size={18} className={isProMode ? "text-yellow-500" : ""} />
           </button>
           <motion.button
             animate={controls}
             onClick={() => setShowMemoryPanel(!showMemoryPanel)}
-            className={`p-1.5 rounded-full transition-colors ${
+            className={`p-2 rounded-full transition-colors ${
               showMemoryPanel ? `${themeClasses.bgTertiary} ${themeClasses.textPrimary}` : themeClasses.hoverBg
             }`}
             title="Memori"
           >
-            <FiCpu size={16} />
+            <FiCpu size={18} />
           </motion.button>
           <button
             onClick={createNewChatRoom}
-            className={`p-1.5 rounded-full ${themeClasses.hoverBg} transition-colors`}
+            className={`p-2 rounded-full ${themeClasses.hoverBg} transition-colors`}
             title="Percakapan Baru"
           >
-            <FiPlus size={16} />
+            <FiPlus size={18} />
           </button>
         </div>
       </div>
@@ -1078,10 +1111,12 @@ and extremely friendly and very human little bit emoticon and get straight to th
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: -20 }}
           transition={{ type: "spring", damping: 25 }}
-          className={`absolute left-3 top-14 ${themeClasses.cardBg} rounded-xl shadow-xl z-20 ${themeClasses.border} w-72`}
+          className={`absolute left-4 top-16 ${themeClasses.cardBg} rounded-xl shadow-xl z-20 ${themeClasses.border} w-80`}
         >
           <div className={`p-3 ${themeClasses.border} flex justify-between items-center`}>
-            <h4 className="font-medium text-sm">Riwayat Percakapan</h4>
+            <h4 className="font-medium text-sm flex items-center">
+              <FiMessageSquare className="mr-2" size={14} /> Riwayat Percakapan
+            </h4>
             <button 
               onClick={() => setShowChatHistory(false)}
               className={`p-1 ${themeClasses.textSecondary} hover:${themeClasses.textPrimary}`}
@@ -1104,9 +1139,19 @@ and extremely friendly and very human little bit emoticon and get straight to th
                     onClick={() => switchChatRoom(room.id)}
                   >
                     <div className="flex justify-between items-start">
-                      <p className="text-xs font-medium break-words pr-2">
-                        {room.name}
-                      </p>
+                      <div className="flex-1">
+                        <p className="text-xs font-medium break-words pr-2">
+                          {room.name}
+                        </p>
+                        <p className="text-xs mt-1 text-gray-500">
+                          {new Date(room.createdAt).toLocaleString('id-ID')}
+                        </p>
+                        {room.messages.length > 0 && (
+                          <p className="text-xs mt-1 truncate">
+                            {room.messages[room.messages.length - 1].text.replace(/<[^>]*>?/gm, '').substring(0, 50)}...
+                          </p>
+                        )}
+                      </div>
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -1117,14 +1162,6 @@ and extremely friendly and very human little bit emoticon and get straight to th
                         <FiTrash2 size={14} />
                       </button>
                     </div>
-                    <p className="text-xs mt-1">
-                      {new Date(room.createdAt).toLocaleString('id-ID')}
-                    </p>
-                    {room.messages.length > 0 && (
-                      <p className="text-xs mt-1 truncate">
-                        {room.messages[room.messages.length - 1].text.replace(/<[^>]*>?/gm, '').substring(0, 50)}...
-                      </p>
-                    )}
                   </div>
                 ))}
               </div>
@@ -1144,15 +1181,15 @@ and extremely friendly and very human little bit emoticon and get straight to th
               initial={{ scale: 0.8, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               transition={{ duration: 0.4, type: 'spring' }}
-              className="w-16 h-16 mb-4 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg"
+              className="w-20 h-20 mb-6 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg"
             >
-              <span className="text-2xl text-white">AI</span>
+              <span className="text-3xl text-white">AI</span>
             </motion.div>
             <motion.h3 
               initial={{ y: 10, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               transition={{ delay: 0.1, duration: 0.3 }}
-              className="text-xl font-semibold text-center mb-1"
+              className="text-2xl font-semibold text-center mb-2"
             >
               Halo, saya Orion 😊!
             </motion.h3>
@@ -1160,7 +1197,7 @@ and extremely friendly and very human little bit emoticon and get straight to th
               initial={{ y: 10, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               transition={{ delay: 0.2, duration: 0.3 }}
-              className="text-center mb-6 max-w-md text-sm"
+              className="text-center mb-8 max-w-md text-sm"
             >
               Asisten AI Anda dengan memori otomatis. Tanyakan apa saja atau unggah file untuk dianalisis.
             </motion.p>
@@ -1170,7 +1207,7 @@ and extremely friendly and very human little bit emoticon and get straight to th
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: 0.3, staggerChildren: 0.1 }}
-                className="grid grid-cols-2 gap-3 w-full max-w-md"
+                className="grid grid-cols-2 gap-4 w-full max-w-md"
               >
                 {[
                   { 
@@ -1196,13 +1233,13 @@ and extremely friendly and very human little bit emoticon and get straight to th
                 ].map((item, index) => (
                   <motion.button
                     key={index}
-                    whileHover={{ y: -2 }}
+                    whileHover={{ y: -3, scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
                     onClick={() => handleTemplateButtonClick(item.message)}
-                    className={`${themeClasses.cardBg} hover:${themeClasses.bgTertiary} ${themeClasses.border} rounded-xl p-3 text-sm transition-all hover:shadow-sm text-left`}
+                    className={`${themeClasses.cardBg} hover:${themeClasses.bgTertiary} ${themeClasses.border} rounded-xl p-4 text-sm transition-all hover:shadow-sm text-left`}
                   >
                     <span className="font-medium">{item.title}</span>
-                    <p className="text-xs mt-1">{item.desc}</p>
+                    <p className="text-xs mt-1 text-gray-500">{item.desc}</p>
                   </motion.button>
                 ))}
               </motion.div>
@@ -1231,14 +1268,14 @@ and extremely friendly and very human little bit emoticon and get straight to th
                   whileHover={{ scale: 1.01 }}
                   className={`max-w-[90%] md:max-w-[80%] ${message.isBot ? 
                     `${themeClasses.cardBg} ${themeClasses.border}` : 
-                    'bg-gradient-to-br from-blue-600 to-blue-500 text-white'} rounded-2xl p-3 shadow-xs`}
+                    'bg-gradient-to-br from-blue-600 to-blue-500 text-white'} rounded-2xl p-4 shadow-xs`}
                 >
                   {message.isBot && (
-                    <div className="flex items-center mb-1">
-                      <div className="w-5 h-5 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center mr-2 shadow">
-                        <span className="text-2xs text-white">AI</span>
+                    <div className="flex items-center mb-2">
+                      <div className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center mr-2 shadow">
+                        <span className="text-xs text-white">AI</span>
                       </div>
-                      <span className="text-xs font-medium">Orion</span>
+                      <span className="text-sm font-medium">Orion</span>
                     </div>
                   )}
                   
@@ -1266,9 +1303,9 @@ and extremely friendly and very human little bit emoticon and get straight to th
                       initial={{ opacity: 0, height: 0 }}
                       animate={{ opacity: 1, height: 'auto' }}
                       transition={{ duration: 0.3 }}
-                      className={`mt-2 pt-2 border-t ${themeClasses.border}`}
+                      className={`mt-3 pt-3 border-t ${themeClasses.border}`}
                     >
-                      <p className="text-xs font-medium mb-1">Sumber:</p>
+                      <p className="text-xs font-medium mb-2">Sumber:</p>
                       <div className="space-y-2">
                         {message.sources.map((source, index) => (
                           <motion.div
@@ -1284,7 +1321,7 @@ and extremely friendly and very human little bit emoticon and get straight to th
                             >
                               {source.title} <FiExternalLink className="ml-1" size={10} />
                             </a>
-                            <p className="text-xs opacity-80 mt-0.5">{source.content}</p>
+                            <p className="text-xs opacity-80 mt-1">{source.content}</p>
                             {source.source && (
                               <span className="text-xs text-gray-500">{source.source}</span>
                             )}
@@ -1294,7 +1331,7 @@ and extremely friendly and very human little bit emoticon and get straight to th
                     </motion.div>
                   )}
                   
-                  <div className="flex items-center justify-between mt-1">
+                  <div className="flex items-center justify-between mt-2">
                     <span className={`text-xs ${message.isBot ? themeClasses.textTertiary : 'text-blue-100'}`}>
                       {message.time}
                       {message.isBot && message.duration > 0 && (
@@ -1311,9 +1348,9 @@ and extremely friendly and very human little bit emoticon and get straight to th
                             title="Salin ke clipboard"
                           >
                             {copiedMessageId === message.id ? (
-                              <FiCheck size={14} className="text-green-500" />
+                              <FiCheck size={16} className="text-green-500" />
                             ) : (
-                              <FiCopy size={14} />
+                              <FiCopy size={16} />
                             )}
                           </button>
                         </>
@@ -1331,16 +1368,16 @@ and extremely friendly and very human little bit emoticon and get straight to th
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.3 }}
-              className={`${themeClasses.cardBg} ${themeClasses.border} rounded-xl p-3 max-w-[90%] md:max-w-[80%]`}
+              className={`${themeClasses.cardBg} ${themeClasses.border} rounded-xl p-4 max-w-[90%] md:max-w-[80%]`}
             >
-              <div className="flex items-center mb-1">
-                <div className="w-5 h-5 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center mr-2 shadow">
-                  <span className="text-2xs text-white">AI</span>
+              <div className="flex items-center mb-2">
+                <div className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center mr-2 shadow">
+                  <span className="text-xs text-white">AI</span>
                 </div>
-                <span className="text-xs font-medium">Memproses</span>
+                <span className="text-sm font-medium">Memproses</span>
               </div>
               
-              <div className="space-y-2 mt-2">
+              <div className="space-y-3 mt-3">
                 {processingSources.map((source) => (
                   <motion.div
                     key={source.id}
@@ -1362,17 +1399,17 @@ and extremely friendly and very human little bit emoticon and get straight to th
                         repeat: Infinity,
                         ease: "easeInOut"
                       }}
-                      className={`w-5 h-5 rounded-full flex items-center justify-center mr-2 ${source.completed ? 'bg-green-500' : 'bg-blue-500'}`}
+                      className={`w-6 h-6 rounded-full flex items-center justify-center mr-3 ${source.completed ? 'bg-green-500' : 'bg-blue-500'}`}
                     >
                       {source.completed ? (
-                        <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                         </svg>
                       ) : (
                         source.icon
                       )}
                     </motion.div>
-                    <span className="text-xs">{source.text}</span>
+                    <span className="text-sm">{source.text}</span>
                   </motion.div>
                 ))}
               </div>
@@ -1387,7 +1424,7 @@ and extremely friendly and very human little bit emoticon and get straight to th
       {showScrollButton && (
         <motion.button
           onClick={scrollToBottomButton}
-          className={`fixed right-4 bottom-20 w-10 h-10 rounded-full ${themeClasses.buttonBg} ${themeClasses.buttonHover} shadow-lg flex items-center justify-center z-10`}
+          className={`fixed right-6 bottom-24 w-10 h-10 rounded-full ${themeClasses.buttonBg} ${themeClasses.buttonHover} shadow-lg flex items-center justify-center z-10`}
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 20 }}
@@ -1406,11 +1443,11 @@ and extremely friendly and very human little bit emoticon and get straight to th
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: 20 }}
           transition={{ type: "spring", damping: 25 }}
-          className={`absolute right-3 top-14 ${themeClasses.cardBg} rounded-xl shadow-xl z-20 ${themeClasses.border} w-80`}
+          className={`absolute right-4 top-16 ${themeClasses.cardBg} rounded-xl shadow-xl z-20 ${themeClasses.border} w-80`}
         >
           <div className={`p-3 ${themeClasses.border} flex justify-between items-center`}>
             <h4 className="font-medium text-sm flex items-center">
-              <FiCpu className="mr-2" size={14} /> Konteks Memori
+              <FiCpu className="mr-2" size={16} /> Konteks Memori
             </h4>
             <div className="flex items-center space-x-2">
               <div className="relative">
@@ -1425,7 +1462,7 @@ and extremely friendly and very human little bit emoticon and get straight to th
                 </select>
                 <FiChevronDown size={12} className="absolute right-2 top-2 pointer-events-none" />
               </div>
-              <button 
+              <button
                 onClick={autoSaveToMemory}
                 disabled={messages.length === 0}
                 className={`text-xs ${themeClasses.bgTertiary} hover:${themeClasses.bgSecondary} px-2 py-1 rounded-lg transition-colors disabled:opacity-50`}
@@ -1458,7 +1495,7 @@ and extremely friendly and very human little bit emoticon and get straight to th
                             <FiStar className="text-yellow-400 flex-shrink-0 mt-0.5" size={12} />
                           )}
                         </div>
-                        <p className="text-xs mt-1">{memory.context.date}</p>
+                        <p className="text-xs mt-1 text-gray-500">{memory.context.date}</p>
                         {memory.context.tags.length > 0 && (
                           <div className="flex flex-wrap gap-1 mt-1">
                             {memory.context.tags.map(tag => (
@@ -1528,7 +1565,7 @@ and extremely friendly and very human little bit emoticon and get straight to th
       )}
 
       {/* Bottom Input Container */}
-      <div className={`${themeClasses.border} ${themeClasses.bgSecondary} pt-2 pb-3 px-4`}>
+      <div className={`${themeClasses.border} ${themeClasses.bgSecondary} pt-3 pb-4 px-4`}>
         
         {/* File Preview */}
         <AnimatePresence>
@@ -1538,7 +1575,7 @@ and extremely friendly and very human little bit emoticon and get straight to th
               animate={{ height: 'auto', opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
               transition={{ duration: 0.3, ease: 'easeInOut' }}
-              className={`flex items-center space-x-2 p-2 ${themeClasses.border} overflow-x-auto scrollbar-thin ${themeClasses.bgTertiary} rounded-t-lg`}
+              className={`flex items-center space-x-3 p-3 ${themeClasses.border} overflow-x-auto scrollbar-thin ${themeClasses.bgTertiary} rounded-t-lg`}
             >
               {pendingFiles.map((file, index) => (
                 <motion.div
@@ -1548,7 +1585,7 @@ and extremely friendly and very human little bit emoticon and get straight to th
                   transition={{ delay: index * 0.05, type: "spring", stiffness: 300 }}
                   className="relative flex-shrink-0"
                 >
-                  <div className={`w-14 h-14 flex items-center justify-center ${themeClasses.cardBg} rounded-lg ${themeClasses.border} overflow-hidden shadow-md`}>
+                  <div className={`w-16 h-16 flex items-center justify-center ${themeClasses.cardBg} rounded-lg ${themeClasses.border} overflow-hidden shadow-md`}>
                     {file.type.startsWith('image/') ? (
                       <img
                         src={URL.createObjectURL(file)}
@@ -1557,8 +1594,8 @@ and extremely friendly and very human little bit emoticon and get straight to th
                       />
                     ) : (
                       <div className="p-1 text-center">
-                        <FiFile size={16} className="mx-auto" />
-                        <p className="text-xs mt-0.5 truncate w-12">{file.name.split('.')[0]}</p>
+                        <FiFile size={18} className="mx-auto" />
+                        <p className="text-xs mt-0.5 truncate w-14">{file.name.split('.')[0]}</p>
                       </div>
                     )}
                   </div>
@@ -1586,7 +1623,7 @@ and extremely friendly and very human little bit emoticon and get straight to th
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3 }}
-            className={`text-xs px-3 py-1 mb-1 rounded-full inline-flex items-center ${searchMode === 'deep' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'}`}
+            className={`text-xs px-3 py-1.5 mb-2 rounded-full inline-flex items-center ${searchMode === 'deep' ? 'bg-purple-100 text-purple-800' : 'bg-blue-100 text-blue-800'}`}
           >
             <FiGlobe size={12} className="mr-1" />
             {searchMode === 'deep' ? 'Pencarian Web Mendalam' : 'Pencarian Web'} aktif
@@ -1616,14 +1653,14 @@ and extremely friendly and very human little bit emoticon and get straight to th
               }
             }}
             placeholder="Ketik pesan Anda..."
-            className={`w-full ${themeClasses.inputBg} ${themeClasses.inputBorder} rounded-xl px-4 py-3 pr-12 focus:outline-none focus:border-transparent resize-none overflow-hidden transition-all duration-300 text-sm ${themeClasses.inputText}`}
+            className={`w-full ${themeClasses.inputBg} ${themeClasses.inputBorder} rounded-xl px-4 py-3 pr-14 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none overflow-hidden transition-all duration-300 text-sm ${themeClasses.inputText}`}
             rows={1}
-            style={{ minHeight: '48px', maxHeight: '120px' }}
+            style={{ minHeight: '52px', maxHeight: '120px' }}
             whileFocus={{ boxShadow: '0 0 0 3px rgba(59,130,246,0.3)' }}
             transition={{ type: "spring", stiffness: 100 }}
           />
 
-          <div className="absolute right-2 bottom-2 flex items-center space-x-1">
+          <div className="absolute right-3 bottom-3 flex items-center space-x-1.5">
             {inputMessage && (
               <motion.button
                 onClick={() => setInputMessage('')}
@@ -1701,7 +1738,7 @@ and extremely friendly and very human little bit emoticon and get straight to th
               animate={{ opacity: 1, height: 'auto' }}
               exit={{ opacity: 0, height: 0 }}
               transition={{ duration: 0.25 }}
-              className="flex space-x-2 pt-2"
+              className="flex space-x-3 pt-3"
             >
               <motion.label
                 className={`cursor-pointer p-2 rounded-lg transition-all ${themeClasses.hoverBg}`}
@@ -1737,6 +1774,35 @@ and extremely friendly and very human little bit emoticon and get straight to th
           )}
         </AnimatePresence>
       </div>
+
+      {/* Ad Banner (Bottom) - Only shown after 10 minutes */}
+      {adTimer >= 600 && (
+        <motion.div 
+          initial={{ opacity: 0, y: 50 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: 50 }}
+          transition={{ duration: 0.3 }}
+          className={`w-full ${themeClasses.bgSecondary} ${themeClasses.border} p-2 flex justify-center items-center sticky bottom-0 z-50`}
+        >
+          <div className="text-center text-xs">
+            <p className="mb-1">Dukung pengembangan dengan menonaktifkan AdBlock</p>
+            <div className="w-full max-w-2xl mx-auto">
+              <ins className="adsbygoogle"
+                style={{ display: 'block' }}
+                data-ad-client="ca-pub-6822768824603153"
+                data-ad-slot="0987654321"
+                data-ad-format="auto"
+                data-full-width-responsive="true"></ins>
+            </div>
+            <button 
+              onClick={() => setAdTimer(0)}
+              className="mt-1 text-xs text-gray-400 hover:text-gray-600"
+            >
+              Tutup iklan
+            </button>
+          </div>
+        </motion.div>
+      )}
 
       {/* Prism.js for syntax highlighting */}
       <link 
@@ -2003,11 +2069,9 @@ and extremely friendly and very human little bit emoticon and get straight to th
           font-style: italic;
           transition: border-color 0.3s ease;
         }
-
         .prose blockquote:hover {
           border-left-color: ${darkMode ? '#64748b' : '#94a3b8'};
         }
-
         .prose hr {
           border: none;
           border-top: 1px solid ${darkMode ? '#334155' : '#e2e8f0'};
