@@ -41,6 +41,13 @@ const ChatBot = () => {
   const [replyQuote, setReplyQuote] = useState(null);
   const [selectedText, setSelectedText] = useState('');
   const [showSelectionToolbar, setShowSelectionToolbar] = useState(false);
+  const [sendCooldownUntil, setSendCooldownUntil] = useState(0);
+  const [cooldownNotice, setCooldownNotice] = useState('');
+  // Rate limit state persisted in localStorage to remember across reloads/tabs
+  const RATE_LIMIT_KEY = 'orion_rate_limit_v1';
+  // Assumption: limit of requests per minute. Change this if you want a different cap.
+  const MAX_REQUESTS_PER_MINUTE = 10;
+  const [rateLimitState, setRateLimitState] = useState({ windowStart: 0, count: 0 });
   
   // Ads removed
   const messagesEndRef = useRef(null);
@@ -49,9 +56,76 @@ const ChatBot = () => {
   const messageCountRef = useRef(0);
   const currentMessageId = useRef(null);
   const controls = useAnimation();
+  const typingIdsRef = useRef(new Set());
+
+  // Rate limit helpers: persist in localStorage and sync across tabs
+  const loadRateLimit = useCallback(() => {
+    try {
+      const raw = localStorage.getItem(RATE_LIMIT_KEY);
+      if (!raw) return { windowStart: 0, count: 0 };
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== 'object') return { windowStart: 0, count: 0 };
+      return parsed;
+    } catch (e) {
+      console.warn('Failed to load rate limit state', e);
+      return { windowStart: 0, count: 0 };
+    }
+  }, []);
+
+  const saveRateLimit = useCallback((state) => {
+    try {
+      localStorage.setItem(RATE_LIMIT_KEY, JSON.stringify(state));
+      // update local state for UI
+      setRateLimitState(state);
+    } catch (e) {
+      console.warn('Failed to save rate limit state', e);
+    }
+  }, []);
+
+  // Try to consume one request slot. Returns true if allowed and consumed, false if limit reached.
+  const tryConsumeRequest = useCallback(() => {
+    const now = Date.now();
+    const state = loadRateLimit();
+    // windowStart is epoch ms for the start of the current minute window
+    const windowStart = state.windowStart || 0;
+    // If window expired (older than 60s), reset
+    if (now - windowStart >= 60_000) {
+      const newState = { windowStart: now, count: 1 };
+      saveRateLimit(newState);
+      return true;
+    }
+
+    if ((state.count || 0) >= MAX_REQUESTS_PER_MINUTE) {
+      // limit reached
+      setRateLimitState(state);
+      return false;
+    }
+
+    const newState = { windowStart, count: (state.count || 0) + 1 };
+    saveRateLimit(newState);
+    return true;
+  }, [loadRateLimit, saveRateLimit]);
+
+  // Sync rate limit state when localStorage changes (other tab)
+  useEffect(() => {
+    const onStorage = (e) => {
+      if (e.key === RATE_LIMIT_KEY) {
+        try {
+          const parsed = JSON.parse(e.newValue || '{}');
+          setRateLimitState(parsed || { windowStart: 0, count: 0 });
+        } catch (err) {
+          setRateLimitState({ windowStart: 0, count: 0 });
+        }
+      }
+    };
+    window.addEventListener('storage', onStorage);
+    // init
+    setRateLimitState(loadRateLimit());
+    return () => window.removeEventListener('storage', onStorage);
+  }, [loadRateLimit]);
 
   // Initialize Google Generative AI
-  const genAI = new GoogleGenerativeAI("AIzaSyDR7XQ6fvruseTsaNyC38AlcZl8s019UPc");
+  const genAI = new GoogleGenerativeAI("AIzaSyBZ_oHyePKOqp2FAujJl7ujJII9BakIe4I");
  const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
   // Ads removed
@@ -160,30 +234,34 @@ const ChatBot = () => {
     // Split text into chunks for smoother animation
     const characters = fullText.split('');
     let displayedText = '';
-    
+  // small initial pause so typing starts quickly, but chunk delays keep overall speed slow
+  await new Promise(resolve => setTimeout(resolve, 60 + Math.floor(Math.random() * 90)));
+
     for (let i = 0; i < characters.length; i++) {
       if (abortController?.signal.aborted) break;
-      
-      // Add next 5-10 characters at a time (smaller chunks for smoother typing)
-      const chunkSize = Math.min(5 + Math.floor(Math.random() * 6), characters.length - i);
+
+      // Much smaller chunks: 1-3 chars for slower, steady typing
+      const chunkSize = Math.min(1 + Math.floor(Math.random() * 3), characters.length - i);
       const chunk = characters.slice(i, i + chunkSize).join('');
       displayedText += chunk;
-      
+
       // Update the message without any blur effect
       callback(displayedText);
       i += chunkSize - 1;
-      
+
       // Smooth scrolling during typing if auto-scroll is enabled
       if (autoScroll) {
         setTimeout(() => {
           messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }, 0);
       }
-      
-      // Random typing speed for more natural feel
-      await new Promise(resolve => setTimeout(resolve, Math.random() * 10 + 20));
+
+      // Increase delay per chunk to slow typing significantly (120-220ms)
+      const delay = 120 + Math.floor(Math.random() * 100);
+      await new Promise(resolve => setTimeout(resolve, delay));
     }
-    
+
+      // ensure final text set exactly
     callback(fullText);
   };
 
@@ -254,12 +332,58 @@ const ChatBot = () => {
   const handleSendMessage = async (messageText, files = []) => {
     const trimmedMessage = messageText.trim();
     if ((!trimmedMessage && files.length === 0) || isBotTyping) return;
+    // initialize timestamp used by rate limiter and cooldown checks
+    const now = Date.now();
+
+    // Check for canned/local replies first (identity/CEO) to avoid using API
+    const canned = getCannedReply(trimmedMessage);
+    if (canned) {
+      // Insert user message and immediate bot reply locally
+      const userMessageObj = createMessageObject(trimmedMessage, false);
+      setMessages(prev => [...prev, userMessageObj]);
+      const botMsg = createMessageObject(canned, true);
+      setMessages(prev => [...prev, botMsg]);
+      setChatHistory(prev => [...prev, { role: 'user', content: trimmedMessage }, { role: 'assistant', content: canned }] );
+      setInputMessage('');
+      return;
+    }
+
+    // Per-minute rate limiter (persistent across reloads/tabs)
+    const stored = loadRateLimit();
+    // If window expired, reset stored for accurate remaining calculation
+    if (now - (stored.windowStart || 0) >= 60_000) {
+      // reset local state
+      saveRateLimit({ windowStart: now, count: 0 });
+      setRateLimitState({ windowStart: now, count: 0 });
+    }
+
+    if (!tryConsumeRequest()) {
+      // compute remaining seconds until window resets
+      const remainingMs = 60_000 - (now - (stored.windowStart || now));
+      const remainingSec = Math.max(1, Math.ceil(remainingMs / 1000));
+      setCooldownNotice(`Batas per menit tercapai. Tunggu ${remainingSec}s.`);
+      // clear notice after a short period but keep stored limiter intact
+      setTimeout(() => setCooldownNotice(''), 3500);
+      return;
+    }
+
+    // Client-side cooldown to reduce rapid repeated API calls
+    const COOLDOWN_MS = 6000; // 6 seconds default cooldown between sends
+    if (now < sendCooldownUntil) {
+      const remaining = Math.ceil((sendCooldownUntil - now) / 1000);
+      setCooldownNotice(`Tunggu ${remaining}s sebelum mengirim lagi.`);
+      setTimeout(() => setCooldownNotice(''), 2000);
+      return;
+    }
 
     const controller = new AbortController();
     setAbortController(controller);
     const timeoutId = setTimeout(() => controller.abort(), 300000);
 
     try {
+      // mark cooldown immediately when starting a request
+      setSendCooldownUntil(Date.now() + COOLDOWN_MS);
+
       // Add user message to chat history
       const userMessage = { role: 'user', content: trimmedMessage };
       const updatedHistory = [...chatHistory, userMessage];
@@ -319,18 +443,20 @@ const ChatBot = () => {
         `Fokus hanya pada kutipan berikut dan jawab berdasar itu:\n"${quoted}"\n\nPercakapan Saat Ini:\n${contextMessages}\n\nUser: "${trimmedMessage}". Respond as Orion in natural language, be concise but very helpful. For coding, provide complete solutions with proper formatting.`
         : `Percakapan Saat Ini:\n${contextMessages}\n\nUser: "${trimmedMessage}". Respond as Orion in natural language, be concise but very helpful. For coding, provide complete solutions with proper formatting. Always maintain context.`;
 
-      // Unified call: try SDK then fallback to proxy
-      const botResponse = await callModel(fullPrompt, controller.signal);
+    // Unified call: try SDK then fallback to proxy
+    const botResponse = await callModel(fullPrompt, controller.signal);
 
-  const processedResponse = processSpecialChars(botResponse);
+    // Remove leading assistant name if model echoes it (e.g., "Orion: ...")
+    const cleanedBotResponse = (botResponse || '').replace(/^\s*(Orion\s*[:\-–—]\s*)/i, '').trim();
+
+    const processedResponse = processSpecialChars(cleanedBotResponse);
       const duration = Date.now() - startTime;
 
-      // Update the message with final response
+      // Update the message metadata (duration/sources/isCode) but DO NOT set full text yet
       setMessages(prev => prev.map(msg => 
         msg.id === messageId 
           ? { 
               ...msg,
-              text: processedResponse, 
               duration,
               sources: webResearchContent.sources,
               isCode: processedResponse.includes('```')
@@ -338,15 +464,32 @@ const ChatBot = () => {
           : msg
       ));
 
-      // Type out the message with animation
-      await typeMessage(processedResponse, (typedText) => {
+      // Mark this message as being typed to prevent other updates from clobbering it
+      typingIdsRef.current.add(messageId);
+
+      // Type out the raw bot response (escaped) to avoid inserting partial HTML
+      // into the DOM while typing. During typing we set an escaped/plain version,
+      // then replace with the final processed HTML after animation completes.
+      await typeMessage(botResponse, (typedText) => {
+        // only update if this message is still being typed
+        if (!typingIdsRef.current.has(messageId)) return;
+        // escape any HTML to avoid rendering incomplete tags and convert newlines to <br/>
+        const escaped = DOMPurify.sanitize(typedText).replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br/>');
         setMessages(prev => prev.map(msg => 
-          msg.id === messageId ? { ...msg, text: typedText } : msg
+          msg.id === messageId ? { ...msg, text: escaped } : msg
         ));
       });
 
-    // Add bot response to chat history
-    const botMessage = { role: 'assistant', content: botResponse };
+      // Replace with final processed HTML after typing completes (only if still tracked)
+      if (typingIdsRef.current.has(messageId)) {
+        setMessages(prev => prev.map(msg => 
+          msg.id === messageId ? { ...msg, text: processedResponse } : msg
+        ));
+        typingIdsRef.current.delete(messageId);
+      }
+
+  // Add bot response to chat history (store cleaned version)
+  const botMessage = { role: 'assistant', content: cleanedBotResponse || botResponse };
     const newChatHistory = [...updatedHistory, botMessage];
     setChatHistory(newChatHistory);
     // Clear reply quote after sending
@@ -364,7 +507,10 @@ const ChatBot = () => {
       setProcessingSources([]);
       clearTimeout(timeoutId);
       setAbortController(null);
-      currentMessageId.current = null;
+      if (currentMessageId.current) {
+        typingIdsRef.current.delete(currentMessageId.current);
+        currentMessageId.current = null;
+      }
     }
   };
 
@@ -396,6 +542,26 @@ const ChatBot = () => {
       .replace(/~~(.*?)~~/g, '<s>$1</s>')
       .replace(/`(.*?)`/g, '<code>$1</code>')
       .replace(/\n/g, '<br />');
+  };
+
+  // Canned replies for identity and CEO questions to ensure Orion does not
+  // claim to be the underlying model (e.g., Gemini) and to provide stable
+  // company/CEO info. Returns a string reply or null.
+  const getCannedReply = (msg) => {
+    if (!msg || typeof msg !== 'string') return null;
+    const m = msg.trim().toLowerCase();
+
+    // Direct identity questions in Indonesian
+    if (/\b(kamu siapa|siapa kamu|siapakah kamu|kamu itu siapa)\b/.test(m)) {
+      return `Saya Orion AI, model bahasa besar yang dikembangkan oleh tim Heyyow Comunication Indonesia.`;
+    }
+
+    // CEO inquiries
+    if (/\b(ceo|who is the ceo|siapa ceo|siapa pendiri|pemimpin perusahaan)\b/.test(m)) {
+      return `CEO: Ferry Fernando. Berpusat di Tangerang.`;
+    }
+
+    return null;
   };
 
   const copyToClipboard = (text, id) => {
@@ -489,6 +655,7 @@ const ChatBot = () => {
 
     if (currentMessageId?.current) {
       setMessages(prev => prev.map(m => m.id === currentMessageId.current ? { ...m, text: (m.text || '') + '\n\n[Generasi dihentikan]' } : m));
+      typingIdsRef.current.delete(currentMessageId.current);
       currentMessageId.current = null;
     }
   };
@@ -817,6 +984,14 @@ const ChatBot = () => {
                     </div>
                   ) : (
                     <>
+                      {/* Typing indicator for the current bot message */}
+                      {message.isBot && isBotTyping && currentMessageId.current === message.id && (!message.text || message.text === '') && (
+                        <div className="flex items-center space-x-1">
+                          <span className="typing-dot" style={{ width: 6, height: 6 }} />
+                          <span className="typing-dot" style={{ width: 6, height: 6 }} />
+                          <span className="typing-dot" style={{ width: 6, height: 6 }} />
+                        </div>
+                      )}
                       {message.quoted && (
                         <div className={`mb-2 p-2 rounded-md text-xs truncate ${themeClasses.bgTertiary} ${themeClasses.textTertiary}`}>{message.quoted}</div>
                       )}
@@ -889,20 +1064,43 @@ const ChatBot = () => {
                     </div>
                   </div>
 
-                  {/* Action buttons below bubble */}
+                  {/* Action buttons below bubble (compact) */}
                   {message.isBot && (
-                    <div className="mt-3 flex items-center space-x-3">
-                      <button onClick={(e) => { e.stopPropagation(); regenerateMessage(message); }} title="Regenerate" className="px-2 py-1 rounded-md text-sm bg-purple-50 hover:bg-purple-100">
-                        <FiRefreshCw size={16} className="inline-block mr-1" /> Regenerate
+                    <div className="mt-2 flex items-center space-x-2">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); regenerateMessage(message); }}
+                        title="Regenerate"
+                        aria-label="Regenerate"
+                        className="w-8 h-8 flex items-center justify-center rounded-md text-xs bg-purple-50 hover:bg-purple-100"
+                      >
+                        <FiRefreshCw size={14} />
                       </button>
-                      <button onClick={(e) => { e.stopPropagation(); likeMessage(message.id); }} title="Like" className={`px-2 py-1 rounded-md text-sm ${message.liked ? 'bg-purple-600 text-white' : 'bg-purple-50 hover:bg-purple-100'}`}>
-                        <FiThumbsUp size={16} className="inline-block mr-1" /> Like
+
+                      <button
+                        onClick={(e) => { e.stopPropagation(); likeMessage(message.id); }}
+                        title="Like"
+                        aria-label="Like"
+                        className={`w-8 h-8 flex items-center justify-center rounded-md text-xs ${message.liked ? 'bg-purple-600 text-white' : 'bg-purple-50 hover:bg-purple-100'}`}
+                      >
+                        <FiThumbsUp size={14} />
                       </button>
-                      <button onClick={(e) => { e.stopPropagation(); dislikeMessage(message.id); }} title="Dislike" className={`px-2 py-1 rounded-md text-sm ${message.disliked ? 'bg-red-500 text-white' : 'bg-purple-50 hover:bg-purple-100'}`}>
-                        <FiThumbsDown size={16} className="inline-block mr-1" /> Dislike
+
+                      <button
+                        onClick={(e) => { e.stopPropagation(); dislikeMessage(message.id); }}
+                        title="Dislike"
+                        aria-label="Dislike"
+                        className={`w-8 h-8 flex items-center justify-center rounded-md text-xs ${message.disliked ? 'bg-red-500 text-white' : 'bg-purple-50 hover:bg-purple-100'}`}
+                      >
+                        <FiThumbsDown size={14} />
                       </button>
-                      <button onClick={(e) => { e.stopPropagation(); replyToMessage(message); }} title="Reply to this" className="px-2 py-1 rounded-md text-sm bg-purple-50 hover:bg-purple-100">
-                        <FiCornerUpLeft size={16} className="inline-block mr-1" /> Reply
+
+                      <button
+                        onClick={(e) => { e.stopPropagation(); replyToMessage(message); }}
+                        title="Reply to this"
+                        aria-label="Reply"
+                        className="w-8 h-8 flex items-center justify-center rounded-md text-xs bg-purple-50 hover:bg-purple-100"
+                      >
+                        <FiCornerUpLeft size={14} />
                       </button>
                       {/* Settings button removed for cleaner message UI */}
                     </div>
@@ -1128,6 +1326,9 @@ const ChatBot = () => {
               </motion.button>
             )}
           </div>
+          {cooldownNotice && (
+            <div className="mt-2 text-xs text-red-500">{cooldownNotice}</div>
+          )}
         </div>
 
         {/* File Options */}
@@ -1460,18 +1661,44 @@ const ChatBot = () => {
           border-bottom-color: currentColor;
         }
 
-        /* Modern input styles */
+        /* Modern input styles - subtle thin purple, smooth transitions */
         .modern-input {
           position: relative;
-          border: 1px solid var(--tw-border-opacity, 1);
-          /* background is controlled via themeClasses inputBg/cardBg */
+          border-radius: 18px;
+          border: 1px solid rgba(124,58,237,0.06); /* very thin purple */
+          background: rgba(124,58,237,0.01); /* subtle purple tint */
+          transition: box-shadow 220ms cubic-bezier(.2,.9,.2,1), border-color 180ms ease, transform 160ms ease, background-color 180ms ease;
+          backdrop-filter: blur(6px);
         }
 
         .modern-input.focused {
-          /* lift the input and give a more vivid purple focus to match the new button presence */
-          box-shadow: 0 16px 48px rgba(20,23,40,0.10), 0 10px 28px rgba(99,102,241,0.08);
           transform: translateY(-2px);
-          border-color: rgba(99,102,241,0.95);
+          border-color: rgba(124,58,237,0.22);
+          box-shadow: 0 10px 30px rgba(124,58,237,0.06), 0 2px 8px rgba(16,24,40,0.04);
+          background: rgba(124,58,237,0.02);
+        }
+
+        /* Floating label tweaks for a thin purple accent */
+        .modern-input .floating-label {
+          color: rgba(124,58,237,0.22);
+          transition: transform 160ms cubic-bezier(.2,.9,.2,1), color 160ms ease, opacity 160ms ease;
+        }
+
+        .modern-input .floating-label.active {
+          transform: translateY(-18px) scale(0.82);
+          color: rgba(124,58,237,0.85);
+          opacity: 0.95;
+        }
+
+        /* Make textarea visually minimal inside the modern input */
+        .modern-input textarea {
+          background: transparent;
+          border: none;
+          outline: none;
+          width: 100%;
+          color: inherit;
+          padding: 6px 0;
+          resize: none;
         }
 
         .floating-label {
